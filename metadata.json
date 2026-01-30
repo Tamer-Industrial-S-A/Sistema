@@ -1,7 +1,0 @@
-{
-  "name": "Industrial Quote Manager (Access Integrated)",
-  "description": "A high-performance React application for industrial automation quoting, technical planning, and project management. Features a robust calculation engine for materials and client management.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}
