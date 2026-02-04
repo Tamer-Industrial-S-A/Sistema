@@ -22,8 +22,12 @@ const App: React.FC = () => {
   const [linkedDirName, setLinkedDirName] = useState<string>('');
   
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('industrial_erp_session');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('industrial_erp_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   const [data, setData] = useState<AppData>(() => {
@@ -37,10 +41,10 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    if (data.CONFIG.supabaseUrl && data.CONFIG.supabaseAnonKey) {
+    if (data.CONFIG?.supabaseUrl && data.CONFIG?.supabaseAnonKey) {
       initSupabase(data.CONFIG.supabaseUrl, data.CONFIG.supabaseAnonKey);
     }
-  }, [data.CONFIG.supabaseUrl, data.CONFIG.supabaseAnonKey]);
+  }, [data.CONFIG]);
 
   useEffect(() => {
     try {
@@ -227,7 +231,6 @@ const App: React.FC = () => {
 
       // --- LIMPIEZA AUTOMÁTICA DE REGISTROS INVÁLIDOS (INTEGRIDAD) ---
       const allClientCodes = new Set(tempUpdatedData.CLIENTES.map(c => c.COD_CLIENTE));
-      const initialOFCount = tempUpdatedData.ORD_FABRICACIONES.length;
       
       // Filtrar OFs que no tienen cliente válido
       tempUpdatedData.ORD_FABRICACIONES = tempUpdatedData.ORD_FABRICACIONES.filter(of => {
@@ -237,7 +240,6 @@ const App: React.FC = () => {
       });
 
       const allOFCodes = new Set(tempUpdatedData.ORD_FABRICACIONES.map(of => of.OF));
-      const initialOTCount = tempUpdatedData.ORD_TRABAJOS.length;
 
       // Filtrar OTs que no tienen OF válida
       tempUpdatedData.ORD_TRABAJOS = tempUpdatedData.ORD_TRABAJOS.filter(ot => {
