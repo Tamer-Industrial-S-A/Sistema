@@ -13,6 +13,8 @@ import { INITIAL_DATA } from './constants.tsx';
 import { Loader2, Construction } from 'lucide-react';
 import { syncToSupabase, pullFromSupabase, initSupabase, isSupabaseReady } from './services/supabaseService.ts';
 
+console.log("TAMER ERP: Componente App inicializado.");
+
 const App: React.FC = () => {
   const [activeSector, setActiveSector] = useState<Sector>('DASHBOARD');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -229,10 +231,7 @@ const App: React.FC = () => {
         await processFile(file);
       }
 
-      // --- LIMPIEZA AUTOMÁTICA DE REGISTROS INVÁLIDOS (INTEGRIDAD) ---
       const allClientCodes = new Set(tempUpdatedData.CLIENTES.map(c => c.COD_CLIENTE));
-      
-      // Filtrar OFs que no tienen cliente válido
       tempUpdatedData.ORD_FABRICACIONES = tempUpdatedData.ORD_FABRICACIONES.filter(of => {
         const isValid = of.COD_CLIENTE && allClientCodes.has(of.COD_CLIENTE);
         if (!isValid) skippedRecords++;
@@ -240,25 +239,20 @@ const App: React.FC = () => {
       });
 
       const allOFCodes = new Set(tempUpdatedData.ORD_FABRICACIONES.map(of => of.OF));
-
-      // Filtrar OTs que no tienen OF válida
       tempUpdatedData.ORD_TRABAJOS = tempUpdatedData.ORD_TRABAJOS.filter(ot => {
         const isValid = ot.OFABRICACION && allOFCodes.has(ot.OFABRICACION);
         if (!isValid) skippedRecords++;
         return isValid;
       });
 
-      // Si después de limpiar no hay nada nuevo
       if (totalNewRecords === 0) {
         alert("ℹ️ No se detectaron registros nuevos en los archivos seleccionados.");
         setIsSyncing(false);
         return;
       }
 
-      // Actualizar estado local
       setData(tempUpdatedData);
 
-      // Sincronización con Supabase si está disponible
       if (isSupabaseReady()) {
         setSyncPhase('Resguardando en la nube...');
         const cloudResult = await syncToSupabase(tempUpdatedData);
