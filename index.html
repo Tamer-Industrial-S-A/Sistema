@@ -32,9 +32,7 @@ body{overflow:hidden}
 ======================== */
 
 const TABLES=["MATERIALES","CLIENTES","ORD_FABRICACIONES","ORD_TRABAJOS"];
-
 const STATE={};
-
 TABLES.forEach(t=>{
 STATE[t]={headers:[],rows:[],visible:[]};
 });
@@ -42,7 +40,6 @@ STATE[t]={headers:[],rows:[],visible:[]};
 function saveState(){
 localStorage.setItem("ERP_STATE",JSON.stringify(STATE));
 }
-
 function loadState(){
 const data=localStorage.getItem("ERP_STATE");
 if(data) Object.assign(STATE,JSON.parse(data));
@@ -56,7 +53,6 @@ loadState();
 let zIndex=10;
 
 function openWindow(title){
-
 const win=document.createElement("div");
 win.className="window bg-white text-black rounded-2xl shadow-xl w-[1100px] h-[700px] p-4";
 win.style.top="60px";
@@ -114,7 +110,6 @@ ${t}
 </button>
 `).join("")}
 </div>
-
 <div id="tabContent"></div>
 `;
 
@@ -146,7 +141,7 @@ renderTable(tabla);
 }
 
 /* ========================
-   IMPORTADOR ESTABLE
+   IMPORTADOR
 ======================== */
 
 function importExcel(tabla){
@@ -173,11 +168,10 @@ blankrows:false
 });
 
 if(!rows || rows.length<2){
-alert("El archivo no contiene datos suficientes");
+alert("Archivo sin datos");
 return;
 }
 
-// Primera fila como encabezado
 const headers=rows[0]
 .map(h=>h.toString().trim())
 .filter(h=>h!=="");
@@ -199,7 +193,7 @@ STATE[tabla].visible=[...headers];
 saveState();
 renderTab(tabla);
 
-alert("Importación exitosa: "+dataRows.length+" registros cargados");
+alert("Importados "+dataRows.length+" registros");
 
 };
 
@@ -210,7 +204,7 @@ input.click();
 }
 
 /* ========================
-   CHECKLIST COLUMNAS
+   CHECKLIST
 ======================== */
 
 function renderChecklist(tabla){
@@ -282,10 +276,11 @@ ${headers.map(h=>`<td class="border p-1">${r[h]||""}</td>`).join("")}
 }
 
 /* ========================
-   COTIZADOR
+   COTIZADOR CON FILTRO
 ======================== */
 
 let cotizacion=[];
+let filtroTexto="";
 
 function renderCotizador(container){
 
@@ -301,13 +296,14 @@ const headers=STATE.MATERIALES.visible.length>0
 container.innerHTML=`
 <h2 class="text-lg font-bold mb-3">Cotización</h2>
 
-<select id="matSelect" class="border p-1 mb-2 w-full">
-${STATE.MATERIALES.rows.map((m,i)=>`
-<option value="${i}">
-${headers.map(h=>m[h]).join(" - ")}
-</option>
-`).join("")}
-</select>
+<input 
+type="text" 
+placeholder="Filtrar por código..." 
+class="border p-1 mb-2 w-full"
+oninput="filtrarMateriales(this.value)"
+>
+
+<select id="matSelect" class="border p-1 mb-2 w-full"></select>
 
 <input id="cantidad" type="number" value="1" class="border p-1 w-20">
 
@@ -329,17 +325,44 @@ ${headers.map(h=>`<th class="border p-1 bg-gray-100">${h}</th>`).join("")}
 
 <h3 class="mt-3 font-bold">TOTAL: $<span id="total">0</span></h3>
 `;
+
+actualizarSelectMateriales();
+}
+
+function filtrarMateriales(texto){
+filtroTexto=texto.toLowerCase();
+actualizarSelectMateriales();
+}
+
+function actualizarSelectMateriales(){
+
+const select=document.getElementById("matSelect");
+select.innerHTML="";
+
+STATE.MATERIALES.rows
+.filter(m=>{
+return Object.values(m)
+.join(" ")
+.toLowerCase()
+.includes(filtroTexto);
+})
+.forEach((m,i)=>{
+const option=document.createElement("option");
+option.value=i;
+option.text=Object.values(m).join(" - ");
+select.appendChild(option);
+});
 }
 
 function agregarItem(){
-const index=document.getElementById("matSelect").value;
+
+const select=document.getElementById("matSelect");
+if(!select.value) return;
+
+const mat=STATE.MATERIALES.rows[select.value];
 const cant=parseFloat(document.getElementById("cantidad").value);
 
-const mat=STATE.MATERIALES.rows[index];
-
 let precio=0;
-
-// Buscar columna PRECIO_UN automáticamente
 if(mat["PRECIO_UN"]){
 precio=parseFloat(mat["PRECIO_UN"]);
 }else{
@@ -350,12 +373,12 @@ precio=parseFloat(v);
 }
 
 const total=precio*cant;
-
 cotizacion.push({mat,cant,total});
 renderCotizacion();
 }
 
 function renderCotizacion(){
+
 const body=document.getElementById("cotBody");
 body.innerHTML="";
 let suma=0;
@@ -373,6 +396,10 @@ ${Object.values(i.mat).map(v=>`<td class="border p-1">${v}</td>`).join("")}
 
 document.getElementById("total").innerText=suma.toFixed(2);
 }
+
+</script>
+</body>
+</html>
 
 </script>
 </body>
