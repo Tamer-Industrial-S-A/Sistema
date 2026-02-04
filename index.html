@@ -57,12 +57,12 @@ function load(){
 load();
 
 /* =========================
-   VALIDAR ESTRUCTURA
+   VALIDACION ENCABEZADOS
 ========================= */
 
 const REQUIRED = {
     MATERIALES:["CODIGO","DESCRIPCION","PRECIO_UN"],
-    CLIENTES:["COD_CLIENTE","RAZON SOCIAL"],
+    CLIENTES:["COD_CLIENTE","RAZON_SOCIAL"],   // <-- MODIFICADO
     ORD_FABRICACIONES:["OF","DESCRIPCION_OF","COD_CLIENTE"],
     ORD_TRABAJOS:["OT","DESCRIPCION_OT","OFABRICACIONES"]
 };
@@ -73,7 +73,7 @@ function validarEstructura(json,tabla){
 }
 
 /* =========================
-   EXCEL
+   IMPORTAR EXCEL
 ========================= */
 
 function importExcel(e,tabla){
@@ -166,6 +166,7 @@ function renderCotizacion(){
         return "<p class='text-red-600'>Debe cargar CLIENTES primero.</p>";
 
     const clientes=STATE.tables.CLIENTES;
+
     const ofs=STATE.tables.ORD_FABRICACIONES.filter(of=>
         of.COD_CLIENTE===STATE.cotizacion.cliente
     );
@@ -184,7 +185,7 @@ function renderCotizacion(){
         <option value="">Seleccionar Cliente</option>
         ${clientes.map(c=>
             `<option value="${c.COD_CLIENTE}">
-            ${c.COD_CLIENTE} - ${c["RAZON SOCIAL"]}
+            ${c.COD_CLIENTE} - ${c.RAZON_SOCIAL}
             </option>`
         ).join("")}
         </select>
@@ -217,7 +218,7 @@ function renderCotizacion(){
 }
 
 /* =========================
-   SELECCIONES RELACIONALES
+   SELECCIONES
 ========================= */
 
 function selectCliente(val){
