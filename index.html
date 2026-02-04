@@ -8,8 +8,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <script>
-        // Evita que la app colapse si process.env no está definido en el navegador
-        window.process = window.process || { env: {} };
+        // Polyfill para process.env
+        window.process = { env: { NODE_ENV: 'production' } };
+        
+        // Capturador de errores antes de que cargue React
+        window.addEventListener('error', function(e) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.style.display = 'block';
+                root.innerHTML = `
+                    <div style="background: #7f1d1d; color: white; padding: 20px; font-family: sans-serif; border-radius: 10px; margin: 20px; border: 2px solid #ef4444;">
+                        <h2 style="margin:0 0 10px 0">❌ Error Crítico de Carga</h2>
+                        <p style="font-size: 14px; margin:0">Fallo en: ${e.filename || 'Script desconocido'}</p>
+                        <p style="font-size: 12px; opacity: 0.8; margin-top: 10px">${e.message}</p>
+                        <button onclick="location.reload()" style="margin-top: 15px; background: white; color: #7f1d1d; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">Reintentar</button>
+                    </div>
+                `;
+            }
+        });
     </script>
 <script type="importmap">
 {
@@ -27,32 +43,26 @@
 }
 </script>
 <style>
-    body {
-        margin: 0;
-        background-color: #f8fafc;
-    }
+    body { margin: 0; background-color: #0f172a; }
     #root:empty {
         display: flex;
         align-items: center;
         justify-content: center;
         height: 100vh;
-        background-color: #0f172a;
-        color: white;
-        font-family: sans-serif;
         flex-direction: column;
         gap: 20px;
+        color: white;
+        font-family: sans-serif;
     }
     #root:empty::after {
         content: "CARGANDO SISTEMA TAMER...";
         font-weight: 900;
         letter-spacing: 0.2em;
         font-size: 0.75rem;
-        animation: pulse 2s infinite;
+        color: #3b82f6;
+        animation: pulse 1.5s infinite;
     }
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
