@@ -1,35 +1,24 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { AppData } from "../types";
 
-// Acceso seguro a la API KEY para evitar ReferenceError
-const getApiKey = () => {
-  try {
-    return (window as any).process?.env?.API_KEY || "";
-  } catch (e) {
-    return "";
-  }
-};
-
-const apiKey = getApiKey();
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+// Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY}); as per library guidelines.
+// Assume process.env.API_KEY is pre-configured and valid in this context.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeStockAndOrders = async (data: AppData) => {
-  if (!ai) {
-    return "La Inteligencia Artificial no está configurada (Falta API KEY).";
-  }
-
   try {
     const prompt = `Analiza los siguientes datos industriales y proporciona 3 recomendaciones clave en formato breve:
     Materiales: ${JSON.stringify(data.MATERIALES.slice(0, 5))}
     Órdenes de Fabricación: ${JSON.stringify(data.ORD_FABRICACIONES.slice(0, 5))}
     Responde en español y enfócate en optimización de stock y cuellos de botella.`;
 
+    // Always use ai.models.generateContent with the model name and prompt.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
+    // The .text property returns the extracted string output directly.
     return response.text || "No se generó respuesta.";
   } catch (error) {
     console.error("Gemini Error:", error);
