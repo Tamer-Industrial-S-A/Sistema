@@ -12,6 +12,7 @@
 body{overflow:hidden}
 .window{position:absolute}
 .titlebar{cursor:move}
+.tab-active{background:#1e293b;color:white}
 </style>
 </head>
 
@@ -27,15 +28,15 @@ body{overflow:hidden}
 <script>
 
 /* =========================
-   ESTADO GLOBAL
+   ESTADO
 ========================= */
 
-const STATE={
-MATERIALES:{headers:[],rows:[],visible:[]},
-CLIENTES:{headers:[],rows:[],visible:[]},
-ORD_FABRICACIONES:{headers:[],rows:[],visible:[]},
-ORD_TRABAJOS:{headers:[],rows:[],visible:[]}
-};
+const TABLES=["MATERIALES","CLIENTES","ORD_FABRICACIONES","ORD_TRABAJOS"];
+
+const STATE={};
+TABLES.forEach(t=>{
+STATE[t]={headers:[],rows:[],visible:[]}
+});
 
 function saveState(){
 localStorage.setItem("ERP_STATE",JSON.stringify(STATE));
@@ -56,9 +57,9 @@ let zIndex=10;
 function openWindow(title){
 
 const win=document.createElement("div");
-win.className="window bg-white text-black rounded-2xl shadow-xl w-[1000px] h-[650px] p-4";
+win.className="window bg-white text-black rounded-2xl shadow-xl w-[1100px] h-[700px] p-4";
 win.style.top="60px";
-win.style.left="150px";
+win.style.left="120px";
 win.style.zIndex=zIndex++;
 
 win.innerHTML=`
@@ -66,7 +67,7 @@ win.innerHTML=`
 <span class="font-bold">${title}</span>
 <button onclick="this.closest('.window').remove()" class="text-red-600 font-bold">X</button>
 </div>
-<div class="content h-[580px] overflow-auto p-2"></div>
+<div class="content h-[620px] overflow-auto p-2"></div>
 `;
 
 document.getElementById("desktop").appendChild(win);
@@ -88,26 +89,13 @@ document.onmouseup=()=>document.onmousemove=null;
 }
 
 /* =========================
-   RENDER
+   RENDER PRINCIPAL
 ========================= */
 
 function renderContent(title,container){
 
 if(title==="CONFIGURACION"){
-container.innerHTML=`
-<h2 class="text-lg font-bold mb-3">Importar Excel</h2>
-
-${Object.keys(STATE).map(t=>`
-<button onclick="importExcel('${t}')" 
-class="bg-blue-600 text-white px-3 py-1 rounded m-1">
-Importar ${t}
-</button>
-`).join("")}
-
-<hr class="my-4">
-
-${renderTables()}
-`;
+renderConfig(container);
 }
 
 if(title==="AUTOMATIZACION"){
@@ -116,34 +104,55 @@ renderCotizador(container);
 }
 
 /* =========================
-   TABLAS
+   CONFIGURACION CON PESTAÑAS
 ========================= */
 
-function renderTables(){
-return Object.keys(STATE).map(tabla=>{
-if(STATE[tabla].rows.length===0)
-return `<h3 class="mt-4 font-bold">${tabla} (sin datos)</h3>`;
+function renderConfig(container){
 
-const headers=STATE[tabla].visible.length>0 ? STATE[tabla].visible : STATE[tabla].headers;
-
-return `
-<h3 class="mt-4 font-bold">${tabla}</h3>
-<table class="w-full text-xs border mb-6">
-<tr>
-${headers.map(h=>`<th class="border p-1 bg-gray-100">${h}</th>`).join("")}
-</tr>
-${STATE[tabla].rows.map(r=>`
-<tr>
-${headers.map(h=>`<td class="border p-1">${r[h]||""}</td>`).join("")}
-</tr>
+container.innerHTML=`
+<div class="flex gap-2 mb-4">
+${TABLES.map(t=>`
+<button onclick="renderTab('${t}')" 
+id="tab-${t}" 
+class="px-3 py-1 rounded bg-slate-300">
+${t}
+</button>
 `).join("")}
-</table>
+</div>
+
+<div id="tabContent"></div>
 `;
-}).join("");
+
+renderTab(TABLES[0]);
+}
+
+function renderTab(tabla){
+
+document.querySelectorAll("[id^='tab-']")
+.forEach(b=>b.classList.remove("tab-active"));
+
+document.getElementById("tab-"+tabla)
+.classList.add("tab-active");
+
+const container=document.getElementById("tabContent");
+
+container.innerHTML=`
+<button onclick="importExcel('${tabla}')" 
+class="bg-blue-600 text-white px-3 py-1 rounded mb-3">
+Importar Excel
+</button>
+
+<div id="checklist-${tabla}" class="mb-4"></div>
+
+<div id="table-${tabla}"></div>
+`;
+
+renderChecklist(tabla);
+renderTable(tabla);
 }
 
 /* =========================
-   IMPORTADOR
+   IMPORTADOR ROBUSTO
 ========================= */
 
 function importExcel(tabla){
@@ -191,7 +200,9 @@ STATE[tabla].visible=[...headers];
 
 saveState();
 
-mostrarSelectorCampos(tabla);
+renderTab(tabla);
+
+alert("Importados "+dataRows.length+" registros");
 
 };
 
@@ -202,52 +213,75 @@ input.click();
 }
 
 /* =========================
-   CHECKLIST CAMPOS
+   CHECKLIST
 ========================= */
 
-function mostrarSelectorCampos(tabla){
+function renderChecklist(tabla){
 
-const modal=document.createElement("div");
-modal.className="fixed inset-0 bg-black/60 flex items-center justify-center";
+const div=document.getElementById("checklist-"+tabla);
 
-modal.innerHTML=`
-<div class="bg-white p-6 rounded-2xl w-[500px] text-black">
-<h2 class="font-bold mb-3">Seleccionar campos visibles (${tabla})</h2>
+if(STATE[tabla].headers.length===0){
+div.innerHTML="";
+return;
+}
 
-<div class="space-y-2 max-h-[300px] overflow-auto">
+div.innerHTML=`
+<h3 class="font-bold mb-2">Columnas visibles</h3>
+<div class="grid grid-cols-3 gap-2">
 ${STATE[tabla].headers.map(h=>`
 <label class="flex items-center gap-2">
-<input type="checkbox" value="${h}" checked>
+<input type="checkbox" 
+${STATE[tabla].visible.includes(h)?"checked":""}
+onchange="toggleColumn('${tabla}','${h}')">
 <span>${h}</span>
 </label>
 `).join("")}
 </div>
-
-<div class="flex justify-end gap-2 mt-4">
-<button onclick="this.closest('.fixed').remove()" 
-class="bg-gray-400 px-3 py-1 rounded">Cancelar</button>
-
-<button onclick="guardarCampos('${tabla}')" 
-class="bg-green-600 text-white px-3 py-1 rounded">
-Guardar
-</button>
-</div>
-</div>
 `;
-
-document.body.appendChild(modal);
 }
 
-function guardarCampos(tabla){
+function toggleColumn(tabla,col){
 
-const modal=document.querySelector(".fixed");
-const checks=modal.querySelectorAll("input[type='checkbox']:checked");
-
-STATE[tabla].visible=[...checks].map(c=>c.value);
+if(STATE[tabla].visible.includes(col)){
+STATE[tabla].visible=
+STATE[tabla].visible.filter(c=>c!==col);
+}else{
+STATE[tabla].visible.push(col);
+}
 
 saveState();
-modal.remove();
-alert("Campos actualizados");
+renderTable(tabla);
+}
+
+/* =========================
+   TABLAS
+========================= */
+
+function renderTable(tabla){
+
+const div=document.getElementById("table-"+tabla);
+
+if(STATE[tabla].rows.length===0){
+div.innerHTML="<p>Sin datos</p>";
+return;
+}
+
+const headers=STATE[tabla].visible.length>0
+?STATE[tabla].visible
+:STATE[tabla].headers;
+
+div.innerHTML=`
+<table class="w-full text-xs border">
+<tr>
+${headers.map(h=>`<th class="border p-1 bg-gray-100">${h}</th>`).join("")}
+</tr>
+${STATE[tabla].rows.map(r=>`
+<tr>
+${headers.map(h=>`<td class="border p-1">${r[h]||""}</td>`).join("")}
+</tr>
+`).join("")}
+</table>
+`;
 }
 
 /* =========================
@@ -263,8 +297,9 @@ container.innerHTML="<h2>No hay materiales cargados</h2>";
 return;
 }
 
-const headers=STATE.MATERIALES.visible.length>0 ? 
-STATE.MATERIALES.visible : STATE.MATERIALES.headers;
+const headers=STATE.MATERIALES.visible.length>0
+?STATE.MATERIALES.visible
+:STATE.MATERIALES.headers;
 
 container.innerHTML=`
 <h2 class="text-lg font-bold mb-3">Cotización</h2>
