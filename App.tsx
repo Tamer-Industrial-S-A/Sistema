@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { TableManager } from './components/TableManager';
-import { CotizacionesManager } from './components/CotizacionesManager';
-import { ComprasManager } from './components/ComprasManager';
-import { ProyectoManager } from './components/ProyectoManager';
-import { ConfiguracionManager } from './components/ConfiguracionManager';
-import { Login } from './components/Login';
-import { Sector, AppData, User, Cliente, Material, OrdFabricacion, OrdTrabajo } from './types';
-import { INITIAL_DATA } from './constants';
+import { Layout } from './components/Layout.tsx';
+import { Dashboard } from './components/Dashboard.tsx';
+import { TableManager } from './components/TableManager.tsx';
+import { CotizacionesManager } from './components/CotizacionesManager.tsx';
+import { ComprasManager } from './components/ComprasManager.tsx';
+import { ProyectoManager } from './components/ProyectoManager.tsx';
+import { ConfiguracionManager } from './components/ConfiguracionManager.tsx';
+import { Login } from './components/Login.tsx';
+import { Sector, AppData, User, Cliente, Material, OrdFabricacion, OrdTrabajo } from './types.ts';
+import { INITIAL_DATA } from './constants.tsx';
 import { Loader2, Construction } from 'lucide-react';
-import { syncToSupabase, pullFromSupabase, initSupabase, isSupabaseReady } from './services/supabaseService';
+import { syncToSupabase, pullFromSupabase, initSupabase, isSupabaseReady } from './services/supabaseService.ts';
 
 const App: React.FC = () => {
   const [activeSector, setActiveSector] = useState<Sector>('DASHBOARD');
