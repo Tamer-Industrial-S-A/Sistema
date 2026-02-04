@@ -8,24 +8,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <script>
-        // Polyfill para process.env
+        // Polyfill para process.env y diagnóstico inicial
         window.process = { env: { NODE_ENV: 'production' } };
+        console.log("Iniciando cargador de sistema TAMER...");
         
-        // Capturador de errores antes de que cargue React
+        // Capturador de errores globales de red y ejecución
         window.addEventListener('error', function(e) {
+            console.error("Error detectado:", e);
             const root = document.getElementById('root');
-            if (root) {
+            if (root && root.innerHTML.includes('CARGANDO')) {
                 root.style.display = 'block';
                 root.innerHTML = `
-                    <div style="background: #7f1d1d; color: white; padding: 20px; font-family: sans-serif; border-radius: 10px; margin: 20px; border: 2px solid #ef4444;">
-                        <h2 style="margin:0 0 10px 0">❌ Error Crítico de Carga</h2>
-                        <p style="font-size: 14px; margin:0">Fallo en: ${e.filename || 'Script desconocido'}</p>
-                        <p style="font-size: 12px; opacity: 0.8; margin-top: 10px">${e.message}</p>
-                        <button onclick="location.reload()" style="margin-top: 15px; background: white; color: #7f1d1d; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">Reintentar</button>
+                    <div style="background: #1e293b; color: #f87171; padding: 30px; font-family: sans-serif; border-radius: 15px; margin: 20px; border: 1px solid #ef4444; shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);">
+                        <h2 style="margin:0 0 10px 0; color: white;">⚠️ Error Crítico de Sistema</h2>
+                        <p style="font-size: 14px; margin:0; color: #94a3b8;">No se pudo iniciar el módulo principal.</p>
+                        <div style="background: #0f172a; padding: 15px; border-radius: 8px; margin-top: 15px; font-family: monospace; font-size: 12px; overflow-x: auto;">
+                            ${e.message}<br>
+                            <span style="color: #64748b;">${e.filename || 'Error de script'}</span>
+                        </div>
+                        <button onclick="location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Reintentar Conexión</button>
                     </div>
                 `;
             }
-        });
+        }, true);
     </script>
 <script type="importmap">
 {
@@ -36,36 +41,46 @@
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "recharts": "https://esm.sh/recharts@3.0.0",
     "@google/genai": "https://esm.sh/@google/genai@0.2.1",
-    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
   }
 }
 </script>
 <style>
-    body { margin: 0; background-color: #0f172a; }
+    body { margin: 0; background-color: #0f172a; overflow: hidden; }
+    #root { height: 100vh; width: 100vw; }
     #root:empty {
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 100vh;
         flex-direction: column;
-        gap: 20px;
+        gap: 24px;
         color: white;
-        font-family: sans-serif;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    }
+    #root:empty::before {
+        content: "";
+        width: 40px;
+        height: 40px;
+        border: 3px solid #3b82f6;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
     }
     #root:empty::after {
         content: "CARGANDO SISTEMA TAMER...";
         font-weight: 900;
-        letter-spacing: 0.2em;
-        font-size: 0.75rem;
-        color: #3b82f6;
-        animation: pulse 1.5s infinite;
+        letter-spacing: 0.3em;
+        font-size: 0.7rem;
+        color: #60a5fa;
+        text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
     }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans">
+<body class="bg-slate-900 text-slate-100 font-sans">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
