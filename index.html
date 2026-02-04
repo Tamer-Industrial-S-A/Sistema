@@ -1,1 +1,295 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAMER INDUSTRIAL S.A. - ERP</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Lucide -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+
+<body class="bg-slate-50">
+
+<div id="app"></div>
+
+<script type="module">
+
+/* ==============================
+   GOOGLE GEMINI IMPORT
+================================*/
+import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+/* ==============================
+   ESTADO GLOBAL
+================================*/
+const STATE = {
+    user: null,
+    currentRoute: "dashboard",
+    tables: {
+        MATERIALES: [],
+        CLIENTES: [],
+        ORD_FABRICACIONES: [],
+        ORD_TRABAJOS: []
+    }
+};
+
+/* ==============================
+   UTILIDADES
+================================*/
+function saveState() {
+    localStorage.setItem("ERP_STATE", JSON.stringify(STATE.tables));
+}
+
+function loadState() {
+    const data = localStorage.getItem("ERP_STATE");
+    if (data) STATE.tables = JSON.parse(data);
+}
+
+function logout() {
+    localStorage.removeItem("ERP_USER");
+    location.reload();
+}
+
+/* ==============================
+   LOGIN
+================================*/
+function renderLogin() {
+    document.getElementById("app").innerHTML = `
+    <div class="h-screen flex items-center justify-center bg-slate-100">
+        <div class="bg-white p-10 rounded-3xl shadow-xl w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center">TAMER INDUSTRIAL S.A.</h2>
+            <input id="user" placeholder="Usuario" class="w-full p-3 mb-4 border rounded-xl">
+            <input id="pass" type="password" placeholder="Contraseña" class="w-full p-3 mb-6 border rounded-xl">
+            <button onclick="login()" class="w-full bg-slate-900 text-white p-3 rounded-xl shadow">Ingresar</button>
+        </div>
+    </div>`;
+}
+
+window.login = function() {
+    const user = document.getElementById("user").value;
+    const pass = document.getElementById("pass").value;
+    if (user === "admin" && pass === "123") {
+        localStorage.setItem("ERP_USER", "admin");
+        init();
+    } else {
+        alert("Credenciales incorrectas");
+    }
+}
+
+/* ==============================
+   LAYOUT PRINCIPAL
+================================*/
+function renderLayout(content) {
+    document.getElementById("app").innerHTML = `
+    <div class="flex h-screen">
+        <aside class="bg-slate-950 text-white w-64 p-6 hidden md:block">
+            <h1 class="text-xl font-bold mb-8">ERP TAMER</h1>
+            ${navButton("dashboard","Dashboard","home")}
+            ${navButton("MATERIALES","Materiales","box")}
+            ${navButton("CLIENTES","Clientes","users")}
+            ${navButton("ORD_FABRICACIONES","Ord. Fabricaciones","factory")}
+            ${navButton("ORD_TRABAJOS","Ord. Trabajos","clipboard-list")}
+            <button onclick="logout()" class="mt-8 text-red-400">Salir</button>
+        </aside>
+        <main class="flex-1 p-8 overflow-auto">${content}</main>
+    </div>`;
+    lucide.createIcons();
+}
+
+function navButton(route,label,icon){
+    return `<button onclick="navigate('${route}')"
+        class="flex items-center gap-2 w-full p-3 mb-2 rounded-xl hover:bg-slate-800">
+        <i data-lucide="${icon}"></i> ${label}
+    </button>`;
+}
+
+window.navigate = function(route){
+    STATE.currentRoute = route;
+    render();
+}
+
+/* ==============================
+   DASHBOARD
+================================*/
+function renderDashboard(){
+    const mat = STATE.tables.MATERIALES.length;
+    const cli = STATE.tables.CLIENTES.length;
+    const fab = STATE.tables.ORD_FABRICACIONES.length;
+    const tra = STATE.tables.ORD_TRABAJOS.length;
+
+    return `
+    <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+    <div class="grid md:grid-cols-4 gap-6 mb-10">
+        ${card("Materiales",mat)}
+        ${card("Clientes",cli)}
+        ${card("Fabricaciones",fab)}
+        ${card("Trabajos",tra)}
+    </div>
+    <div class="bg-white p-6 rounded-3xl shadow mb-6">
+        <canvas id="chart"></canvas>
+    </div>
+    <div class="bg-white p-6 rounded-3xl shadow">
+        <button onclick="analizarIA()" class="bg-slate-900 text-white px-6 py-2 rounded-xl shadow mb-4">
+            Analizar con IA
+        </button>
+        <textarea id="iaResult" class="w-full h-40 border rounded-xl p-3"></textarea>
+    </div>
+    `;
+}
+
+function card(title,value){
+    return `<div class="bg-white p-6 rounded-3xl shadow text-center">
+        <h3 class="text-lg">${title}</h3>
+        <p class="text-3xl font-bold">${value}</p>
+    </div>`;
+}
+
+/* ==============================
+   TABLAS CRUD
+================================*/
+function renderTable(name){
+    const data = STATE.tables[name];
+    let headers = data.length ? Object.keys(data[0]) : ["Campo1","Campo2"];
+
+    return `
+    <h2 class="text-2xl font-bold mb-4">${name}</h2>
+    <div class="mb-4 flex gap-4">
+        <button onclick="addRow('${name}')" class="bg-slate-900 text-white px-4 py-2 rounded-xl shadow">Agregar</button>
+        <button onclick="exportExcel('${name}')" class="bg-green-600 text-white px-4 py-2 rounded-xl shadow">Exportar Excel</button>
+        <input type="file" onchange="importExcel(event,'${name}')">
+    </div>
+    <div class="bg-white rounded-3xl shadow overflow-auto">
+        <table class="w-full">
+            <thead class="bg-slate-200">
+                <tr>${headers.map(h=>`<th class="p-3">${h}</th>`).join("")}
+                <th></th></tr>
+            </thead>
+            <tbody>
+                ${data.map((row,i)=>`
+                    <tr class="border-t">
+                    ${headers.map(h=>`
+                        <td contenteditable
+                        onblur="updateCell('${name}',${i},'${h}',this.innerText)"
+                        class="p-3">${row[h]||""}</td>`).join("")}
+                        <td><button onclick="deleteRow('${name}',${i})">❌</button></td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>
+    </div>
+    `;
+}
+
+window.addRow = function(name){
+    STATE.tables[name].push({});
+    saveState(); render();
+}
+
+window.deleteRow = function(name,i){
+    STATE.tables[name].splice(i,1);
+    saveState(); render();
+}
+
+window.updateCell = function(name,i,key,val){
+    STATE.tables[name][i][key] = val;
+    saveState();
+}
+
+/* ==============================
+   EXCEL
+================================*/
+window.exportExcel = function(name){
+    const ws = XLSX.utils.json_to_sheet(STATE.tables[name]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, name);
+    XLSX.writeFile(wb, name+".xlsx");
+}
+
+window.importExcel = function(e,name){
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = function(evt){
+        const wb = XLSX.read(evt.target.result,{type:'binary'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws);
+        STATE.tables[name] = json;
+        saveState();
+        render();
+    };
+    reader.readAsBinaryString(file);
+}
+
+/* ==============================
+   CHART
+================================*/
+function renderChart(){
+    const mat = STATE.tables.MATERIALES.slice(0,10);
+    const labels = mat.map((m,i)=>m.nombre||"Mat"+i);
+    const stock = mat.map(m=>parseInt(m.stock)||0);
+
+    new Chart(document.getElementById("chart"),{
+        type:"bar",
+        data:{labels,datasets:[{label:"Stock",data:stock}]}
+    });
+}
+
+/* ==============================
+   GEMINI IA
+================================*/
+window.analizarIA = async function(){
+    const apiKey = "YOUR_GEMINI_API_KEY";
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const total = STATE.tables.MATERIALES.length;
+
+    const prompt = `Tengo ${total} materiales registrados en mi ERP industrial. 
+    Dame recomendaciones para optimizar inventario.`;
+
+    const result = await model.generateContent(prompt);
+    document.getElementById("iaResult").value = result.response.text();
+}
+
+/* ==============================
+   RENDER PRINCIPAL
+================================*/
+function render(){
+    if (STATE.currentRoute==="dashboard"){
+        renderLayout(renderDashboard());
+        setTimeout(renderChart,100);
+    } else {
+        renderLayout(renderTable(STATE.currentRoute));
+    }
+}
+
+/* ==============================
+   INIT
+================================*/
+function init(){
+    loadState();
+    STATE.user = localStorage.getItem("ERP_USER");
+    if (!STATE.user) renderLogin();
+    else render();
+}
+
+init();
+
+</script>
+</body>
+</html>
