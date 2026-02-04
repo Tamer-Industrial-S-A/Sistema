@@ -27,15 +27,16 @@ body{overflow:hidden}
 
 <script>
 
-/* =========================
-   ESTADO
-========================= */
+/* ========================
+   ESTADO GLOBAL
+======================== */
 
 const TABLES=["MATERIALES","CLIENTES","ORD_FABRICACIONES","ORD_TRABAJOS"];
 
 const STATE={};
+
 TABLES.forEach(t=>{
-STATE[t]={headers:[],rows:[],visible:[]}
+STATE[t]={headers:[],rows:[],visible:[]};
 });
 
 function saveState(){
@@ -48,9 +49,9 @@ if(data) Object.assign(STATE,JSON.parse(data));
 }
 loadState();
 
-/* =========================
+/* ========================
    VENTANAS
-========================= */
+======================== */
 
 let zIndex=10;
 
@@ -88,24 +89,18 @@ document.onmouseup=()=>document.onmousemove=null;
 };
 }
 
-/* =========================
-   RENDER PRINCIPAL
-========================= */
+/* ========================
+   RENDER
+======================== */
 
 function renderContent(title,container){
-
-if(title==="CONFIGURACION"){
-renderConfig(container);
+if(title==="CONFIGURACION") renderConfig(container);
+if(title==="AUTOMATIZACION") renderCotizador(container);
 }
 
-if(title==="AUTOMATIZACION"){
-renderCotizador(container);
-}
-}
-
-/* =========================
-   CONFIGURACION CON PESTAÑAS
-========================= */
+/* ========================
+   CONFIGURACION
+======================== */
 
 function renderConfig(container){
 
@@ -143,7 +138,6 @@ Importar Excel
 </button>
 
 <div id="checklist-${tabla}" class="mb-4"></div>
-
 <div id="table-${tabla}"></div>
 `;
 
@@ -151,9 +145,9 @@ renderChecklist(tabla);
 renderTable(tabla);
 }
 
-/* =========================
-   IMPORTADOR ROBUSTO
-========================= */
+/* ========================
+   IMPORTADOR ESTABLE
+======================== */
 
 function importExcel(tabla){
 
@@ -162,6 +156,7 @@ input.type="file";
 input.accept=".xlsx,.xls";
 
 input.onchange=e=>{
+
 const file=e.target.files[0];
 const reader=new FileReader();
 
@@ -171,26 +166,29 @@ const data=new Uint8Array(evt.target.result);
 const wb=XLSX.read(data,{type:"array"});
 const sheet=wb.Sheets[wb.SheetNames[0]];
 
-const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:""});
+const rows=XLSX.utils.sheet_to_json(sheet,{
+header:1,
+defval:"",
+blankrows:false
+});
 
-if(rows.length===0){
-alert("Archivo vacío");
+if(!rows || rows.length<2){
+alert("El archivo no contiene datos suficientes");
 return;
 }
 
-let headerIndex=rows.findIndex(r=>r.filter(c=>c!=="").length>=2);
-if(headerIndex===-1){
-alert("No se detectaron encabezados");
-return;
-}
+// Primera fila como encabezado
+const headers=rows[0]
+.map(h=>h.toString().trim())
+.filter(h=>h!=="");
 
-const headers=rows[headerIndex].map(h=>h.toString().trim());
-
-const dataRows=rows.slice(headerIndex+1)
+const dataRows=rows.slice(1)
 .filter(r=>r.some(c=>c!==""))
 .map(r=>{
 let obj={};
-headers.forEach((h,i)=>obj[h]=r[i]||"");
+headers.forEach((h,i)=>{
+obj[h]=(r[i]!==undefined ? r[i] : "").toString().trim();
+});
 return obj;
 });
 
@@ -199,10 +197,9 @@ STATE[tabla].rows=dataRows;
 STATE[tabla].visible=[...headers];
 
 saveState();
-
 renderTab(tabla);
 
-alert("Importados "+dataRows.length+" registros");
+alert("Importación exitosa: "+dataRows.length+" registros cargados");
 
 };
 
@@ -212,9 +209,9 @@ reader.readAsArrayBuffer(file);
 input.click();
 }
 
-/* =========================
-   CHECKLIST
-========================= */
+/* ========================
+   CHECKLIST COLUMNAS
+======================== */
 
 function renderChecklist(tabla){
 
@@ -230,7 +227,7 @@ div.innerHTML=`
 <div class="grid grid-cols-3 gap-2">
 ${STATE[tabla].headers.map(h=>`
 <label class="flex items-center gap-2">
-<input type="checkbox" 
+<input type="checkbox"
 ${STATE[tabla].visible.includes(h)?"checked":""}
 onchange="toggleColumn('${tabla}','${h}')">
 <span>${h}</span>
@@ -253,9 +250,9 @@ saveState();
 renderTable(tabla);
 }
 
-/* =========================
+/* ========================
    TABLAS
-========================= */
+======================== */
 
 function renderTable(tabla){
 
@@ -284,9 +281,9 @@ ${headers.map(h=>`<td class="border p-1">${r[h]||""}</td>`).join("")}
 `;
 }
 
-/* =========================
+/* ========================
    COTIZADOR
-========================= */
+======================== */
 
 let cotizacion=[];
 
@@ -304,7 +301,7 @@ const headers=STATE.MATERIALES.visible.length>0
 container.innerHTML=`
 <h2 class="text-lg font-bold mb-3">Cotización</h2>
 
-<select id="matSelect" class="border p-1 mb-2">
+<select id="matSelect" class="border p-1 mb-2 w-full">
 ${STATE.MATERIALES.rows.map((m,i)=>`
 <option value="${i}">
 ${headers.map(h=>m[h]).join(" - ")}
@@ -341,10 +338,16 @@ const cant=parseFloat(document.getElementById("cantidad").value);
 const mat=STATE.MATERIALES.rows[index];
 
 let precio=0;
+
+// Buscar columna PRECIO_UN automáticamente
+if(mat["PRECIO_UN"]){
+precio=parseFloat(mat["PRECIO_UN"]);
+}else{
 Object.values(mat).forEach(v=>{
 if(!isNaN(parseFloat(v)) && precio===0)
 precio=parseFloat(v);
 });
+}
 
 const total=precio*cant;
 
