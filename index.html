@@ -9,11 +9,12 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-body { overflow:hidden }
-.window { position:absolute; }
-.titlebar { cursor:move; }
+body{overflow:hidden}
+.window{position:absolute}
+.titlebar{cursor:move}
 </style>
 </head>
+
 <body class="bg-slate-900 text-white">
 
 <div id="desktop" class="w-screen h-screen relative"></div>
@@ -24,9 +25,10 @@ body { overflow:hidden }
 </div>
 
 <script>
-/* ======================
-   ESTADO DINÁMICO
-====================== */
+
+/* =========================
+   ESTADO GLOBAL
+========================= */
 
 const STATE={
 MATERIALES:{headers:[],rows:[]},
@@ -45,26 +47,26 @@ if(data) Object.assign(STATE,JSON.parse(data));
 }
 loadState();
 
-/* ======================
-   VENTANAS
-====================== */
+/* =========================
+   SISTEMA DE VENTANAS
+========================= */
 
 let zIndex=10;
 
 function openWindow(title){
 
 const win=document.createElement("div");
-win.className="window bg-white text-black rounded-2xl shadow-xl w-[900px] h-[550px] p-4";
-win.style.top="50px";
-win.style.left="120px";
+win.className="window bg-white text-black rounded-2xl shadow-xl w-[950px] h-[600px] p-4";
+win.style.top="60px";
+win.style.left="150px";
 win.style.zIndex=zIndex++;
 
 win.innerHTML=`
-<div class="titlebar bg-slate-200 p-2 rounded-t-xl flex justify-between">
+<div class="titlebar bg-slate-200 p-2 rounded-t-xl flex justify-between items-center">
 <span class="font-bold">${title}</span>
-<button onclick="this.closest('.window').remove()" class="text-red-600">X</button>
+<button onclick="this.closest('.window').remove()" class="text-red-600 font-bold">X</button>
 </div>
-<div class="content h-[480px] overflow-auto p-2"></div>
+<div class="content h-[520px] overflow-auto p-2"></div>
 `;
 
 document.getElementById("desktop").appendChild(win);
@@ -85,22 +87,25 @@ document.onmouseup=()=>document.onmousemove=null;
 };
 }
 
-/* ======================
-   CONFIGURACION
-====================== */
+/* =========================
+   RENDER
+========================= */
 
 function renderContent(title,container){
 
 if(title==="CONFIGURACION"){
 container.innerHTML=`
-<h2 class="font-bold mb-2">Importar Excel</h2>
+<h2 class="text-lg font-bold mb-3">Importar Excel</h2>
+
 ${Object.keys(STATE).map(t=>`
 <button onclick="importExcel('${t}')" 
 class="bg-blue-600 text-white px-3 py-1 rounded m-1">
 Importar ${t}
 </button>
 `).join("")}
+
 <hr class="my-4">
+
 ${renderTables()}
 `;
 }
@@ -117,13 +122,13 @@ return `<h3 class="mt-4 font-bold">${tabla} (sin datos)</h3>`;
 
 return `
 <h3 class="mt-4 font-bold">${tabla}</h3>
-<table class="w-full text-xs border">
+<table class="w-full text-xs border mb-6">
 <tr>
-${STATE[tabla].headers.map(h=>`<th class="border p-1">${h}</th>`).join("")}
+${STATE[tabla].headers.map(h=>`<th class="border p-1 bg-gray-100">${h}</th>`).join("")}
 </tr>
 ${STATE[tabla].rows.map(r=>`
 <tr>
-${STATE[tabla].headers.map(h=>`<td class="border p-1">${r[h] || ""}</td>`).join("")}
+${STATE[tabla].headers.map(h=>`<td class="border p-1">${r[h]||""}</td>`).join("")}
 </tr>
 `).join("")}
 </table>
@@ -131,9 +136,9 @@ ${STATE[tabla].headers.map(h=>`<td class="border p-1">${r[h] || ""}</td>`).join(
 }).join("");
 }
 
-/* ======================
-   IMPORTACION DINAMICA
-====================== */
+/* =========================
+   IMPORTADOR ROBUSTO REAL
+========================= */
 
 function importExcel(tabla){
 
@@ -146,23 +151,49 @@ const file=e.target.files[0];
 const reader=new FileReader();
 
 reader.onload=evt=>{
+
 const data=new Uint8Array(evt.target.result);
 const wb=XLSX.read(data,{type:"array"});
 const sheet=wb.Sheets[wb.SheetNames[0]];
-const json=XLSX.utils.sheet_to_json(sheet,{defval:""});
 
-if(json.length===0){
+// Leer como matriz completa
+const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:""});
+
+if(rows.length===0){
 alert("Archivo vacío");
 return;
 }
 
-const headers=Object.keys(json[0]);
+// Buscar primera fila con al menos 2 columnas con datos
+let headerIndex = rows.findIndex(r => 
+r.filter(c => c !== "").length >= 2
+);
+
+if(headerIndex === -1){
+alert("No se detectaron encabezados");
+return;
+}
+
+const headers = rows[headerIndex].map(h => h.toString().trim());
+
+// Construir registros
+const dataRows = rows.slice(headerIndex+1)
+.filter(r => r.some(c => c !== ""))
+.map(r=>{
+let obj={};
+headers.forEach((h,i)=>{
+obj[h]=r[i] || "";
+});
+return obj;
+});
 
 STATE[tabla].headers=headers;
-STATE[tabla].rows=json;
+STATE[tabla].rows=dataRows;
 
 saveState();
-alert("Importación correcta");
+
+alert("Importación correcta: "+dataRows.length+" registros cargados");
+
 };
 
 reader.readAsArrayBuffer(file);
@@ -171,9 +202,9 @@ reader.readAsArrayBuffer(file);
 input.click();
 }
 
-/* ======================
-   COTIZADOR DINAMICO
-====================== */
+/* =========================
+   COTIZADOR
+========================= */
 
 let cotizacion=[];
 
@@ -187,7 +218,8 @@ return;
 const headers=STATE.MATERIALES.headers;
 
 container.innerHTML=`
-<h2 class="font-bold mb-3">Cotización</h2>
+<h2 class="text-lg font-bold mb-3">Cotización</h2>
+
 <select id="matSelect" class="border p-1 mb-2">
 ${STATE.MATERIALES.rows.map((m,i)=>`
 <option value="${i}">
@@ -197,16 +229,18 @@ ${headers.map(h=>m[h]).join(" - ")}
 </select>
 
 <input id="cantidad" type="number" value="1" class="border p-1 w-20">
-<button onclick="agregarItem()" class="bg-blue-600 text-white px-3 py-1 rounded ml-2">
+
+<button onclick="agregarItem()" 
+class="bg-green-600 text-white px-3 py-1 rounded ml-2">
 Agregar
 </button>
 
 <table class="w-full text-xs border mt-4">
 <thead>
 <tr>
-${headers.map(h=>`<th class="border p-1">${h}</th>`).join("")}
-<th class="border p-1">CANT</th>
-<th class="border p-1">TOTAL</th>
+${headers.map(h=>`<th class="border p-1 bg-gray-100">${h}</th>`).join("")}
+<th class="border p-1 bg-gray-100">CANT</th>
+<th class="border p-1 bg-gray-100">TOTAL</th>
 </tr>
 </thead>
 <tbody id="cotBody"></tbody>
@@ -219,10 +253,17 @@ ${headers.map(h=>`<th class="border p-1">${h}</th>`).join("")}
 function agregarItem(){
 const index=document.getElementById("matSelect").value;
 const cant=parseFloat(document.getElementById("cantidad").value);
+
 const mat=STATE.MATERIALES.rows[index];
 
-const precio = parseFloat(Object.values(mat).find(v=>!isNaN(v))) || 0;
-const total = precio*cant;
+// Detectar automáticamente precio (primer número encontrado)
+let precio=0;
+Object.values(mat).forEach(v=>{
+if(!isNaN(parseFloat(v)) && precio===0)
+precio=parseFloat(v);
+});
+
+const total=precio*cant;
 
 cotizacion.push({mat,cant,total});
 renderCotizacion();
@@ -246,6 +287,7 @@ ${Object.values(i.mat).map(v=>`<td class="border p-1">${v}</td>`).join("")}
 
 document.getElementById("total").innerText=suma.toFixed(2);
 }
+
 </script>
 </body>
 </html>
