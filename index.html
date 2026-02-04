@@ -3,360 +3,320 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TAMER INDUSTRIAL</title>
+<title>TAMER INDUSTRIAL ERP</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
 <style>
-body { font-family:'Inter',sans-serif; overflow:hidden; }
+body { overflow:hidden }
 .window { position:absolute; }
+.titlebar { cursor:move; }
 </style>
 </head>
-
 <body class="bg-slate-900 text-white">
 
-<div class="flex h-screen">
+<!-- Desktop -->
+<div id="desktop" class="w-screen h-screen relative"></div>
 
-<div class="w-60 bg-slate-950 p-5">
-    <h1 class="text-xl font-bold mb-6">TAMER SYSTEM</h1>
-    <button onclick="openWindow('AUTOMATIZACION')" class="w-full mb-3 p-3 bg-slate-800 rounded-xl">AUTOMATIZACIÓN</button>
-    <button onclick="openWindow('CONFIGURACION')" class="w-full mb-3 p-3 bg-slate-800 rounded-xl">CONFIGURACIÓN</button>
-</div>
-
-<div id="desktop" class="flex-1 relative"></div>
+<!-- Taskbar -->
+<div class="absolute bottom-0 left-0 right-0 bg-slate-800 h-12 flex items-center px-4 gap-4">
+<button onclick="openWindow('AUTOMATIZACION')" class="bg-slate-700 px-3 py-1 rounded">AUTOMATIZACION</button>
+<button onclick="openWindow('COMPRAS')" class="bg-slate-700 px-3 py-1 rounded">COMPRAS</button>
+<button onclick="openWindow('PROYECTO')" class="bg-slate-700 px-3 py-1 rounded">PROYECTO</button>
+<button onclick="openWindow('CONFIGURACION')" class="bg-slate-700 px-3 py-1 rounded">CONFIGURACION</button>
 </div>
 
 <script>
-
-/* =========================
-   ESTADO
-========================= */
-
-const STATE = {
-    tables:{
-        MATERIALES:[],
-        CLIENTES:[],
-        ORD_FABRICACIONES:[],
-        ORD_TRABAJOS:[]
-    },
-    cotizacion:{
-        cliente:null,
-        of:null,
-        ot:null,
-        items:[]
-    }
+/* =======================
+   ESTADO GLOBAL
+======================= */
+const STATE={
+MATERIALES:[],
+CLIENTES:[],
+ORD_FABRICACIONES:[],
+ORD_TRABAJOS:[]
 };
 
-function save(){ localStorage.setItem("APP_STATE",JSON.stringify(STATE)); }
-function load(){
-    const d=localStorage.getItem("APP_STATE");
-    if(d) Object.assign(STATE,JSON.parse(d));
-}
-load();
-
-/* =========================
-   VALIDACION ENCABEZADOS
-========================= */
-
-const REQUIRED = {
-    MATERIALES:["CODIGO","DESCRIPCION","PRECIO_UN"],
-    CLIENTES:["COD_CLIENTE","RAZON_SOCIAL"],   // <-- MODIFICADO
-    ORD_FABRICACIONES:["OF","DESCRIPCION_OF","COD_CLIENTE"],
-    ORD_TRABAJOS:["OT","DESCRIPCION_OT","OFABRICACIONES"]
+const REQUIRED={
+MATERIALES:["CODIGO","DESCRIPCION","PRECIO_UN"],
+CLIENTES:["COD_CLIENTE","RAZON_SOCIAL"],
+ORD_FABRICACIONES:["OF","DESCRIPCION_OF","COD_CLIENTE"],
+ORD_TRABAJOS:["OT","DESCRIPCION_OT","OFABRICACIONES"]
 };
 
-function validarEstructura(json,tabla){
-    const headers=Object.keys(json[0]||{});
-    return REQUIRED[tabla].every(h=>headers.includes(h));
+function saveState(){
+localStorage.setItem("ERP_STATE",JSON.stringify(STATE));
 }
 
-/* =========================
-   IMPORTAR EXCEL
-========================= */
-
-function importExcel(e,tabla){
-    const file=e.target.files[0];
-    const reader=new FileReader();
-
-    reader.onload=function(evt){
-        const wb=XLSX.read(evt.target.result,{type:'binary'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        const json=XLSX.utils.sheet_to_json(ws,{defval:""});
-
-        if(!validarEstructura(json,tabla)){
-            alert("Encabezados incorrectos para "+tabla);
-            return;
-        }
-
-        STATE.tables[tabla]=json;
-        save();
-        alert(tabla+" cargado: "+json.length+" registros");
-    };
-
-    reader.readAsBinaryString(file);
+function loadState(){
+const data=localStorage.getItem("ERP_STATE");
+if(data) Object.assign(STATE,JSON.parse(data));
 }
+loadState();
 
-/* =========================
+/* =======================
    VENTANAS
-========================= */
+======================= */
+let zIndex=10;
 
-let z=1;
 function openWindow(title){
 
-    const win=document.createElement("div");
-    win.className="window bg-slate-100 text-black rounded-2xl shadow-2xl w-[900px]";
-    win.style.top="100px";
-    win.style.left="200px";
-    win.style.zIndex=z++;
+const win=document.createElement("div");
+win.className="window bg-slate-50 text-black rounded-2xl shadow-xl w-[800px] h-[500px] p-4";
+win.style.top="50px";
+win.style.left="100px";
+win.style.zIndex=zIndex++;
 
-    win.innerHTML=`
-        <div class="bg-slate-800 text-white p-3 rounded-t-2xl cursor-move flex justify-between">
-            <span>${title}</span>
-            <button onclick="this.closest('.window').remove()">✖</button>
-        </div>
-        <div class="p-6 h-[600px] overflow-auto content-area">
-            ${renderContent(title)}
-        </div>
-    `;
+win.innerHTML=`
+<div class="titlebar bg-slate-200 p-2 rounded-t-xl flex justify-between items-center">
+<span class="font-bold">${title}</span>
+<button onclick="this.closest('.window').remove()" class="text-red-600">X</button>
+</div>
+<div class="content h-[430px] overflow-auto p-2"></div>
+`;
 
-    makeDraggable(win);
-    document.getElementById("desktop").appendChild(win);
+document.getElementById("desktop").appendChild(win);
+makeDraggable(win);
+
+renderContent(title,win.querySelector(".content"));
 }
-
-/* =========================
-   CONTENIDO
-========================= */
-
-function renderContent(title){
-
-    if(title==="CONFIGURACION"){
-        return `
-        <h2 class="text-xl font-bold mb-4">Carga de Excel</h2>
-        ${loader("MATERIALES")}
-        ${loader("CLIENTES")}
-        ${loader("ORD_FABRICACIONES")}
-        ${loader("ORD_TRABAJOS")}
-        `;
-    }
-
-    if(title==="AUTOMATIZACION"){
-        return renderCotizacion();
-    }
-}
-
-function loader(tabla){
-    return `
-    <div class="mb-4">
-        <label class="font-semibold">${tabla}</label>
-        <input type="file" accept=".xlsx"
-        onchange="importExcel(event,'${tabla}')"
-        class="border p-2 rounded w-full">
-    </div>`;
-}
-
-/* =========================
-   COTIZACION RELACIONAL
-========================= */
-
-function renderCotizacion(){
-
-    if(STATE.tables.CLIENTES.length===0)
-        return "<p class='text-red-600'>Debe cargar CLIENTES primero.</p>";
-
-    const clientes=STATE.tables.CLIENTES;
-
-    const ofs=STATE.tables.ORD_FABRICACIONES.filter(of=>
-        of.COD_CLIENTE===STATE.cotizacion.cliente
-    );
-
-    const ots=STATE.tables.ORD_TRABAJOS.filter(ot=>
-        ot.OFABRICACIONES===STATE.cotizacion.of
-    );
-
-    return `
-    <h2 class="text-xl font-bold mb-4">Cotización</h2>
-
-    <div class="grid grid-cols-3 gap-4 mb-4">
-
-        <select onchange="selectCliente(this.value)"
-        class="border p-2 rounded">
-        <option value="">Seleccionar Cliente</option>
-        ${clientes.map(c=>
-            `<option value="${c.COD_CLIENTE}">
-            ${c.COD_CLIENTE} - ${c.RAZON_SOCIAL}
-            </option>`
-        ).join("")}
-        </select>
-
-        <select onchange="selectOF(this.value)"
-        class="border p-2 rounded">
-        <option value="">Seleccionar OF</option>
-        ${ofs.map(of=>
-            `<option value="${of.OF}">
-            ${of.OF} - ${of.DESCRIPCION_OF}
-            </option>`
-        ).join("")}
-        </select>
-
-        <select onchange="selectOT(this.value)"
-        class="border p-2 rounded">
-        <option value="">Seleccionar OT</option>
-        ${ots.map(ot=>
-            `<option value="${ot.OT}">
-            ${ot.OT} - ${ot.DESCRIPCION_OT}
-            </option>`
-        ).join("")}
-        </select>
-
-    </div>
-
-    ${renderMateriales()}
-    ${renderTablaItems()}
-    `;
-}
-
-/* =========================
-   SELECCIONES
-========================= */
-
-function selectCliente(val){
-    STATE.cotizacion.cliente=val;
-    STATE.cotizacion.of=null;
-    STATE.cotizacion.ot=null;
-    refresh();
-}
-
-function selectOF(val){
-    STATE.cotizacion.of=val;
-    STATE.cotizacion.ot=null;
-    refresh();
-}
-
-function selectOT(val){
-    STATE.cotizacion.ot=val;
-    refresh();
-}
-
-/* =========================
-   MATERIALES
-========================= */
-
-function renderMateriales(){
-
-    if(STATE.tables.MATERIALES.length===0)
-        return "<p class='text-red-600'>Debe cargar MATERIALES.</p>";
-
-    return `
-    <div class="flex gap-2 mb-4">
-        <select id="matSel" class="border p-2 rounded w-full">
-            ${STATE.tables.MATERIALES.map((m,i)=>
-                `<option value="${i}">
-                ${m.CODIGO} - ${m.DESCRIPCION}
-                </option>`
-            ).join("")}
-        </select>
-
-        <input id="cant" type="number"
-        placeholder="Cant"
-        class="border p-2 rounded w-24">
-
-        <button onclick="agregarItem()"
-        class="bg-slate-800 text-white px-4 rounded">
-        Agregar
-        </button>
-    </div>`;
-}
-
-function agregarItem(){
-
-    const i=document.getElementById("matSel").value;
-    const cant=parseFloat(document.getElementById("cant").value)||0;
-    const m=STATE.tables.MATERIALES[i];
-
-    STATE.cotizacion.items.push({
-        CODIGO:m.CODIGO,
-        DESCRIPCION:m.DESCRIPCION,
-        PRECIO:m.PRECIO_UN,
-        CANT:cant,
-        TOTAL:(m.PRECIO_UN*cant).toFixed(2)
-    });
-
-    save();
-    refresh();
-}
-
-/* =========================
-   TABLA ITEMS
-========================= */
-
-function renderTablaItems(){
-
-    return `
-    <table class="w-full bg-white text-sm mt-4">
-        <thead class="bg-slate-200">
-            <tr>
-                <th>CODIGO</th>
-                <th>DESCRIPCION</th>
-                <th>PRECIO</th>
-                <th>CANT</th>
-                <th>TOTAL</th>
-            </tr>
-        </thead>
-        <tbody>
-        ${STATE.cotizacion.items.map(i=>`
-            <tr>
-                <td>${i.CODIGO}</td>
-                <td>${i.DESCRIPCION}</td>
-                <td>${i.PRECIO}</td>
-                <td>${i.CANT}</td>
-                <td>${i.TOTAL}</td>
-            </tr>
-        `).join("")}
-        </tbody>
-    </table>
-
-    <div class="text-right mt-4 font-bold">
-        TOTAL GENERAL:
-        ${STATE.cotizacion.items
-            .reduce((s,i)=>s+parseFloat(i.TOTAL),0)
-            .toFixed(2)}
-    </div>`;
-}
-
-/* =========================
-   REFRESH
-========================= */
-
-function refresh(){
-    document.querySelector(".content-area").innerHTML=
-        renderCotizacion();
-}
-
-/* =========================
-   DRAG
-========================= */
 
 function makeDraggable(el){
-    const header=el.querySelector(".cursor-move");
-    let x=0,y=0;
-
-    header.onmousedown=function(e){
-        x=e.clientX-el.offsetLeft;
-        y=e.clientY-el.offsetTop;
-
-        document.onmousemove=function(e){
-            el.style.left=(e.clientX-x)+"px";
-            el.style.top=(e.clientY-y)+"px";
-        }
-
-        document.onmouseup=function(){
-            document.onmousemove=null;
-        }
-    }
+const bar=el.querySelector(".titlebar");
+bar.onmousedown=e=>{
+const offsetX=e.clientX-el.offsetLeft;
+const offsetY=e.clientY-el.offsetTop;
+document.onmousemove=e=>{
+el.style.left=(e.clientX-offsetX)+"px";
+el.style.top=(e.clientY-offsetY)+"px";
+};
+document.onmouseup=()=>document.onmousemove=null;
+};
 }
 
+/* =======================
+   RENDER CONTENIDO
+======================= */
+function renderContent(title,container){
+
+if(title==="CONFIGURACION"){
+container.innerHTML=`
+<h2 class="font-bold mb-2">Importar Excel</h2>
+${Object.keys(REQUIRED).map(t=>`
+<button onclick="importExcel('${t}')" 
+class="bg-blue-600 text-white px-3 py-1 rounded m-1">
+Importar ${t}
+</button>
+`).join("")}
+<hr class="my-3">
+${renderTables()}
+`;
+}
+
+if(title==="AUTOMATIZACION"){
+renderCotizador(container);
+}
+
+if(title==="COMPRAS"){
+container.innerHTML="<h2>Modulo Compras (en desarrollo)</h2>";
+}
+
+if(title==="PROYECTO"){
+container.innerHTML="<h2>Modulo Proyecto (en desarrollo)</h2>";
+}
+}
+
+function renderTables(){
+return Object.keys(STATE).map(tabla=>{
+if(STATE[tabla].length===0) return `<h3 class="mt-4 font-bold">${tabla} (sin datos)</h3>`;
+return `
+<h3 class="mt-4 font-bold">${tabla}</h3>
+<table class="w-full text-xs border">
+<tr>
+${Object.keys(STATE[tabla][0]).map(h=>`<th class="border p-1">${h}</th>`).join("")}
+</tr>
+${STATE[tabla].map(r=>`
+<tr>
+${Object.values(r).map(v=>`<td class="border p-1">${v}</td>`).join("")}
+</tr>
+`).join("")}
+</table>
+`;
+}).join("");
+}
+
+/* =======================
+   IMPORTADOR INTELIGENTE
+======================= */
+function normalizar(txt){
+return txt.toString().trim().toUpperCase().replace(/\s+/g,"").replace(/_/g,"");
+}
+
+function importExcel(tabla){
+
+const input=document.createElement("input");
+input.type="file";
+input.accept=".xlsx,.xls";
+
+input.onchange=e=>{
+const file=e.target.files[0];
+const reader=new FileReader();
+
+reader.onload=evt=>{
+const data=new Uint8Array(evt.target.result);
+const wb=XLSX.read(data,{type:"array"});
+const sheet=wb.Sheets[wb.SheetNames[0]];
+const json=XLSX.utils.sheet_to_json(sheet,{defval:""});
+
+if(json.length===0){alert("Archivo vacío");return;}
+
+const headersOriginal=Object.keys(json[0]);
+const headersNorm=headersOriginal.map(h=>normalizar(h));
+const requeridosNorm=REQUIRED[tabla].map(h=>normalizar(h));
+
+const faltantes=requeridosNorm.filter(r=>!headersNorm.includes(r));
+
+if(faltantes.length>0){
+alert("Faltan columnas:\n"+faltantes.join("\n"));
+return;
+}
+
+const map={};
+headersOriginal.forEach(h=>map[normalizar(h)]=h);
+
+const datos=json.map(row=>{
+const obj={};
+REQUIRED[tabla].forEach(col=>{
+obj[col]=row[map[normalizar(col)]];
+});
+return obj;
+});
+
+mostrarPreview(datos,tabla);
+};
+
+reader.readAsArrayBuffer(file);
+};
+
+input.click();
+}
+
+function mostrarPreview(datos,tabla){
+
+const modal=document.createElement("div");
+modal.className="fixed inset-0 bg-black/60 flex items-center justify-center";
+
+modal.innerHTML=`
+<div class="bg-white p-6 rounded-2xl w-4/5 max-h-[80vh] overflow-auto text-black">
+<h2 class="font-bold mb-2">Preview ${tabla}</h2>
+<table class="w-full text-xs border mb-4">
+<tr>
+${Object.keys(datos[0]).map(h=>`<th class="border p-1">${h}</th>`).join("")}
+</tr>
+${datos.slice(0,20).map(r=>`
+<tr>
+${Object.values(r).map(v=>`<td class="border p-1">${v}</td>`).join("")}
+</tr>
+`).join("")}
+</table>
+<div class="flex justify-end gap-2">
+<button onclick="this.closest('.fixed').remove()" class="bg-gray-400 px-3 py-1 rounded">Cancelar</button>
+<button onclick="confirmImport('${tabla}')" class="bg-green-600 text-white px-3 py-1 rounded">Confirmar</button>
+</div>
+</div>
+`;
+
+modal.dataset.tabla=tabla;
+modal.dataset.datos=JSON.stringify(datos);
+
+document.body.appendChild(modal);
+}
+
+function confirmImport(tabla){
+const modal=document.querySelector(".fixed");
+const datos=JSON.parse(modal.dataset.datos);
+STATE[tabla]=[...STATE[tabla],...datos];
+saveState();
+modal.remove();
+alert("Importación completada");
+}
+
+/* =======================
+   COTIZADOR
+======================= */
+function renderCotizador(container){
+
+if(STATE.MATERIALES.length===0){
+container.innerHTML="<h2>No hay materiales cargados</h2>";
+return;
+}
+
+container.innerHTML=`
+<h2 class="font-bold mb-2">Cotización</h2>
+<select id="matSelect" class="border p-1 mb-2">
+${STATE.MATERIALES.map((m,i)=>`
+<option value="${i}">
+${m.CODIGO} - ${m.DESCRIPCION} ($${m.PRECIO_UN})
+</option>
+`).join("")}
+</select>
+<input id="cantidad" type="number" value="1" class="border p-1 w-20">
+<button onclick="agregarItem()" class="bg-blue-600 text-white px-3 py-1 rounded ml-2">
+Agregar
+</button>
+
+<table class="w-full text-xs border mt-4">
+<thead>
+<tr>
+<th class="border p-1">CODIGO</th>
+<th class="border p-1">DESCRIPCION</th>
+<th class="border p-1">PRECIO</th>
+<th class="border p-1">CANT</th>
+<th class="border p-1">TOTAL</th>
+</tr>
+</thead>
+<tbody id="cotBody"></tbody>
+</table>
+
+<h3 class="mt-3 font-bold">TOTAL: $<span id="total">0</span></h3>
+`;
+}
+
+let cotizacion=[];
+
+function agregarItem(){
+const index=document.getElementById("matSelect").value;
+const cant=parseFloat(document.getElementById("cantidad").value);
+const mat=STATE.MATERIALES[index];
+
+const total=mat.PRECIO_UN*cant;
+
+cotizacion.push({...mat,cant,total});
+
+renderCotizacion();
+}
+
+function renderCotizacion(){
+const body=document.getElementById("cotBody");
+body.innerHTML="";
+let suma=0;
+
+cotizacion.forEach(i=>{
+suma+=i.total;
+body.innerHTML+=`
+<tr>
+<td class="border p-1">${i.CODIGO}</td>
+<td class="border p-1">${i.DESCRIPCION}</td>
+<td class="border p-1">${i.PRECIO_UN}</td>
+<td class="border p-1">${i.cant}</td>
+<td class="border p-1">${i.total}</td>
+</tr>
+`;
+});
+
+document.getElementById("total").innerText=suma.toFixed(2);
+}
 </script>
 </body>
 </html>
