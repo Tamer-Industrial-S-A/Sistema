@@ -1,33 +1,40 @@
 
-
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 
-const startApp = () => {
-  const container = document.getElementById('root');
-  if (!container) return;
+console.log("index.tsx: Iniciando montaje de React en #root...");
 
-  try {
-    const root = createRoot(container);
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
-    console.log("TAMER ERP: Aplicación montada con éxito.");
-  } catch (error: any) {
-    console.error("Error crítico en el montaje:", error);
-    // Use type assertion to any to access custom showError function injected at runtime
-    if ((window as any).showError) {
-      (window as any).showError("Error de Inicio", error.message, "index.tsx");
+const mountApp = () => {
+    const container = document.getElementById('root');
+    if (!container) {
+        console.error("index.tsx: Error Fatal - No se encontró el contenedor principal del DOM.");
+        return;
     }
-  }
+
+    try {
+        const root = createRoot(container);
+        root.render(
+            <React.StrictMode>
+                <App />
+            </React.StrictMode>
+        );
+        console.log("index.tsx: App enviada al renderizador con éxito.");
+    } catch (err: any) {
+        console.error("index.tsx: Fallo durante la inicialización de React:", err);
+        // Fallback visual directo si React falla al iniciar
+        container.innerHTML = `
+            <div style="color: white; background: #1e293b; padding: 20px; border-radius: 10px; font-family: sans-serif;">
+                <h2 style="color: #ef4444;">❌ Error de Renderizado</h2>
+                <p>${err.message}</p>
+            </div>
+        `;
+    }
 };
 
-// Asegurar que el DOM esté listo
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startApp);
+// Ejecución inmediata si el navegador ya procesó el DOM
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    mountApp();
 } else {
-  startApp();
-} 
+    window.addEventListener('DOMContentLoaded', mountApp);
+}
