@@ -4,14 +4,22 @@ import { AppData } from '../types';
 
 let supabaseInstance: SupabaseClient | null = null;
 
+const getEnvVar = (name: string): string => {
+  try {
+    return (window as any).process?.env?.[name] || "";
+  } catch (e) {
+    return "";
+  }
+};
+
 export const initSupabase = (url?: string, key?: string) => {
-  const finalUrl = url?.trim() || (process.env as any).SUPABASE_URL;
-  const finalKey = key?.trim() || (process.env as any).SUPABASE_ANON_KEY;
+  const finalUrl = url?.trim() || getEnvVar('SUPABASE_URL');
+  const finalKey = key?.trim() || getEnvVar('SUPABASE_ANON_KEY');
 
   if (finalUrl && finalKey) {
     try {
       if (!finalUrl.startsWith('http')) {
-        console.error("URL de Supabase inválida");
+        console.warn("URL de Supabase mal formateada");
         return false;
       }
       supabaseInstance = createClient(finalUrl, finalKey);
@@ -37,15 +45,11 @@ export const testConnection = async () => {
   }
 };
 
-/**
- * Sincroniza los datos con Supabase en el orden correcto para evitar errores de FK.
- * El orden es: MATERIALES -> CLIENTES -> ORD_FABRICACIONES -> ORD_TRABAJOS
- */
 export const syncToSupabase = async (data: AppData) => {
   if (!supabaseInstance) return { success: false, error: "Supabase no está configurado" };
 
   try {
-    // 1. MATERIALES (Independiente)
+    // 1. MATERIALES
     if (data.MATERIALES.length > 0) {
       const { error } = await supabaseInstance.from('materiales').upsert(
         data.MATERIALES.map(m => ({
@@ -61,7 +65,7 @@ export const syncToSupabase = async (data: AppData) => {
       if (error) throw new Error(`Materiales: ${error.message}`);
     }
 
-    // 2. CLIENTES (Independiente)
+    // 2. CLIENTES
     if (data.CLIENTES.length > 0) {
       const { error } = await supabaseInstance.from('clientes').upsert(
         data.CLIENTES.map(c => ({
@@ -73,7 +77,7 @@ export const syncToSupabase = async (data: AppData) => {
       if (error) throw new Error(`Clientes: ${error.message}`);
     }
 
-    // 3. OFs (Depende de CLIENTES)
+    // 3. OFs
     if (data.ORD_FABRICACIONES.length > 0) {
       const { error } = await supabaseInstance.from('ord_fabricaciones').upsert(
         data.ORD_FABRICACIONES.map(of => ({
@@ -89,7 +93,7 @@ export const syncToSupabase = async (data: AppData) => {
       if (error) throw new Error(`OFs: ${error.message}`);
     }
 
-    // 4. OTs (Depende de OFs)
+    // 4. OTs
     if (data.ORD_TRABAJOS.length > 0) {
       const { error } = await supabaseInstance.from('ord_trabajos').upsert(
         data.ORD_TRABAJOS.map(ot => ({
@@ -136,7 +140,6 @@ export const pullFromSupabase = async (): Promise<{data: Partial<AppData> | null
           EN_STOCK: m.en_stock
         })) || [],
         CLIENTES: resCli.data?.map(c => ({
-          // Fix: Corrected variable name from 'm' to 'c' to fix the "Cannot find name 'm'" error on this mapping block.
           COD_CLIENTE: c.cod_cliente,
           RAZON_SOCIAL: c.razon_social
         })) || [],
