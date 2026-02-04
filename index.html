@@ -16,33 +16,23 @@ body { overflow:hidden }
 </head>
 <body class="bg-slate-900 text-white">
 
-<!-- Desktop -->
 <div id="desktop" class="w-screen h-screen relative"></div>
 
-<!-- Taskbar -->
 <div class="absolute bottom-0 left-0 right-0 bg-slate-800 h-12 flex items-center px-4 gap-4">
 <button onclick="openWindow('AUTOMATIZACION')" class="bg-slate-700 px-3 py-1 rounded">AUTOMATIZACION</button>
-<button onclick="openWindow('COMPRAS')" class="bg-slate-700 px-3 py-1 rounded">COMPRAS</button>
-<button onclick="openWindow('PROYECTO')" class="bg-slate-700 px-3 py-1 rounded">PROYECTO</button>
 <button onclick="openWindow('CONFIGURACION')" class="bg-slate-700 px-3 py-1 rounded">CONFIGURACION</button>
 </div>
 
 <script>
-/* =======================
-   ESTADO GLOBAL
-======================= */
-const STATE={
-MATERIALES:[],
-CLIENTES:[],
-ORD_FABRICACIONES:[],
-ORD_TRABAJOS:[]
-};
+/* ======================
+   ESTADO DINÁMICO
+====================== */
 
-const REQUIRED={
-MATERIALES:["CODIGO","DESCRIPCION","PRECIO_UN"],
-CLIENTES:["COD_CLIENTE","RAZON_SOCIAL"],
-ORD_FABRICACIONES:["OF","DESCRIPCION_OF","COD_CLIENTE"],
-ORD_TRABAJOS:["OT","DESCRIPCION_OT","OFABRICACIONES"]
+const STATE={
+MATERIALES:{headers:[],rows:[]},
+CLIENTES:{headers:[],rows:[]},
+ORD_FABRICACIONES:{headers:[],rows:[]},
+ORD_TRABAJOS:{headers:[],rows:[]}
 };
 
 function saveState(){
@@ -55,61 +45,62 @@ if(data) Object.assign(STATE,JSON.parse(data));
 }
 loadState();
 
-/* =======================
+/* ======================
    VENTANAS
-======================= */
+====================== */
+
 let zIndex=10;
 
 function openWindow(title){
 
 const win=document.createElement("div");
-win.className="window bg-slate-50 text-black rounded-2xl shadow-xl w-[800px] h-[500px] p-4";
+win.className="window bg-white text-black rounded-2xl shadow-xl w-[900px] h-[550px] p-4";
 win.style.top="50px";
-win.style.left="100px";
+win.style.left="120px";
 win.style.zIndex=zIndex++;
 
 win.innerHTML=`
-<div class="titlebar bg-slate-200 p-2 rounded-t-xl flex justify-between items-center">
+<div class="titlebar bg-slate-200 p-2 rounded-t-xl flex justify-between">
 <span class="font-bold">${title}</span>
 <button onclick="this.closest('.window').remove()" class="text-red-600">X</button>
 </div>
-<div class="content h-[430px] overflow-auto p-2"></div>
+<div class="content h-[480px] overflow-auto p-2"></div>
 `;
 
 document.getElementById("desktop").appendChild(win);
 makeDraggable(win);
-
 renderContent(title,win.querySelector(".content"));
 }
 
 function makeDraggable(el){
 const bar=el.querySelector(".titlebar");
 bar.onmousedown=e=>{
-const offsetX=e.clientX-el.offsetLeft;
-const offsetY=e.clientY-el.offsetTop;
+const ox=e.clientX-el.offsetLeft;
+const oy=e.clientY-el.offsetTop;
 document.onmousemove=e=>{
-el.style.left=(e.clientX-offsetX)+"px";
-el.style.top=(e.clientY-offsetY)+"px";
+el.style.left=(e.clientX-ox)+"px";
+el.style.top=(e.clientY-oy)+"px";
 };
 document.onmouseup=()=>document.onmousemove=null;
 };
 }
 
-/* =======================
-   RENDER CONTENIDO
-======================= */
+/* ======================
+   CONFIGURACION
+====================== */
+
 function renderContent(title,container){
 
 if(title==="CONFIGURACION"){
 container.innerHTML=`
 <h2 class="font-bold mb-2">Importar Excel</h2>
-${Object.keys(REQUIRED).map(t=>`
+${Object.keys(STATE).map(t=>`
 <button onclick="importExcel('${t}')" 
 class="bg-blue-600 text-white px-3 py-1 rounded m-1">
 Importar ${t}
 </button>
 `).join("")}
-<hr class="my-3">
+<hr class="my-4">
 ${renderTables()}
 `;
 }
@@ -117,28 +108,22 @@ ${renderTables()}
 if(title==="AUTOMATIZACION"){
 renderCotizador(container);
 }
-
-if(title==="COMPRAS"){
-container.innerHTML="<h2>Modulo Compras (en desarrollo)</h2>";
-}
-
-if(title==="PROYECTO"){
-container.innerHTML="<h2>Modulo Proyecto (en desarrollo)</h2>";
-}
 }
 
 function renderTables(){
 return Object.keys(STATE).map(tabla=>{
-if(STATE[tabla].length===0) return `<h3 class="mt-4 font-bold">${tabla} (sin datos)</h3>`;
+if(STATE[tabla].rows.length===0)
+return `<h3 class="mt-4 font-bold">${tabla} (sin datos)</h3>`;
+
 return `
 <h3 class="mt-4 font-bold">${tabla}</h3>
 <table class="w-full text-xs border">
 <tr>
-${Object.keys(STATE[tabla][0]).map(h=>`<th class="border p-1">${h}</th>`).join("")}
+${STATE[tabla].headers.map(h=>`<th class="border p-1">${h}</th>`).join("")}
 </tr>
-${STATE[tabla].map(r=>`
+${STATE[tabla].rows.map(r=>`
 <tr>
-${Object.values(r).map(v=>`<td class="border p-1">${v}</td>`).join("")}
+${STATE[tabla].headers.map(h=>`<td class="border p-1">${r[h] || ""}</td>`).join("")}
 </tr>
 `).join("")}
 </table>
@@ -146,12 +131,9 @@ ${Object.values(r).map(v=>`<td class="border p-1">${v}</td>`).join("")}
 }).join("");
 }
 
-/* =======================
-   IMPORTADOR INTELIGENTE
-======================= */
-function normalizar(txt){
-return txt.toString().trim().toUpperCase().replace(/\s+/g,"").replace(/_/g,"");
-}
+/* ======================
+   IMPORTACION DINAMICA
+====================== */
 
 function importExcel(tabla){
 
@@ -169,31 +151,18 @@ const wb=XLSX.read(data,{type:"array"});
 const sheet=wb.Sheets[wb.SheetNames[0]];
 const json=XLSX.utils.sheet_to_json(sheet,{defval:""});
 
-if(json.length===0){alert("Archivo vacío");return;}
-
-const headersOriginal=Object.keys(json[0]);
-const headersNorm=headersOriginal.map(h=>normalizar(h));
-const requeridosNorm=REQUIRED[tabla].map(h=>normalizar(h));
-
-const faltantes=requeridosNorm.filter(r=>!headersNorm.includes(r));
-
-if(faltantes.length>0){
-alert("Faltan columnas:\n"+faltantes.join("\n"));
+if(json.length===0){
+alert("Archivo vacío");
 return;
 }
 
-const map={};
-headersOriginal.forEach(h=>map[normalizar(h)]=h);
+const headers=Object.keys(json[0]);
 
-const datos=json.map(row=>{
-const obj={};
-REQUIRED[tabla].forEach(col=>{
-obj[col]=row[map[normalizar(col)]];
-});
-return obj;
-});
+STATE[tabla].headers=headers;
+STATE[tabla].rows=json;
 
-mostrarPreview(datos,tabla);
+saveState();
+alert("Importación correcta");
 };
 
 reader.readAsArrayBuffer(file);
@@ -202,65 +171,31 @@ reader.readAsArrayBuffer(file);
 input.click();
 }
 
-function mostrarPreview(datos,tabla){
+/* ======================
+   COTIZADOR DINAMICO
+====================== */
 
-const modal=document.createElement("div");
-modal.className="fixed inset-0 bg-black/60 flex items-center justify-center";
+let cotizacion=[];
 
-modal.innerHTML=`
-<div class="bg-white p-6 rounded-2xl w-4/5 max-h-[80vh] overflow-auto text-black">
-<h2 class="font-bold mb-2">Preview ${tabla}</h2>
-<table class="w-full text-xs border mb-4">
-<tr>
-${Object.keys(datos[0]).map(h=>`<th class="border p-1">${h}</th>`).join("")}
-</tr>
-${datos.slice(0,20).map(r=>`
-<tr>
-${Object.values(r).map(v=>`<td class="border p-1">${v}</td>`).join("")}
-</tr>
-`).join("")}
-</table>
-<div class="flex justify-end gap-2">
-<button onclick="this.closest('.fixed').remove()" class="bg-gray-400 px-3 py-1 rounded">Cancelar</button>
-<button onclick="confirmImport('${tabla}')" class="bg-green-600 text-white px-3 py-1 rounded">Confirmar</button>
-</div>
-</div>
-`;
-
-modal.dataset.tabla=tabla;
-modal.dataset.datos=JSON.stringify(datos);
-
-document.body.appendChild(modal);
-}
-
-function confirmImport(tabla){
-const modal=document.querySelector(".fixed");
-const datos=JSON.parse(modal.dataset.datos);
-STATE[tabla]=[...STATE[tabla],...datos];
-saveState();
-modal.remove();
-alert("Importación completada");
-}
-
-/* =======================
-   COTIZADOR
-======================= */
 function renderCotizador(container){
 
-if(STATE.MATERIALES.length===0){
+if(STATE.MATERIALES.rows.length===0){
 container.innerHTML="<h2>No hay materiales cargados</h2>";
 return;
 }
 
+const headers=STATE.MATERIALES.headers;
+
 container.innerHTML=`
-<h2 class="font-bold mb-2">Cotización</h2>
+<h2 class="font-bold mb-3">Cotización</h2>
 <select id="matSelect" class="border p-1 mb-2">
-${STATE.MATERIALES.map((m,i)=>`
+${STATE.MATERIALES.rows.map((m,i)=>`
 <option value="${i}">
-${m.CODIGO} - ${m.DESCRIPCION} ($${m.PRECIO_UN})
+${headers.map(h=>m[h]).join(" - ")}
 </option>
 `).join("")}
 </select>
+
 <input id="cantidad" type="number" value="1" class="border p-1 w-20">
 <button onclick="agregarItem()" class="bg-blue-600 text-white px-3 py-1 rounded ml-2">
 Agregar
@@ -269,9 +204,7 @@ Agregar
 <table class="w-full text-xs border mt-4">
 <thead>
 <tr>
-<th class="border p-1">CODIGO</th>
-<th class="border p-1">DESCRIPCION</th>
-<th class="border p-1">PRECIO</th>
+${headers.map(h=>`<th class="border p-1">${h}</th>`).join("")}
 <th class="border p-1">CANT</th>
 <th class="border p-1">TOTAL</th>
 </tr>
@@ -283,17 +216,15 @@ Agregar
 `;
 }
 
-let cotizacion=[];
-
 function agregarItem(){
 const index=document.getElementById("matSelect").value;
 const cant=parseFloat(document.getElementById("cantidad").value);
-const mat=STATE.MATERIALES[index];
+const mat=STATE.MATERIALES.rows[index];
 
-const total=mat.PRECIO_UN*cant;
+const precio = parseFloat(Object.values(mat).find(v=>!isNaN(v))) || 0;
+const total = precio*cant;
 
-cotizacion.push({...mat,cant,total});
-
+cotizacion.push({mat,cant,total});
 renderCotizacion();
 }
 
@@ -306,11 +237,9 @@ cotizacion.forEach(i=>{
 suma+=i.total;
 body.innerHTML+=`
 <tr>
-<td class="border p-1">${i.CODIGO}</td>
-<td class="border p-1">${i.DESCRIPCION}</td>
-<td class="border p-1">${i.PRECIO_UN}</td>
+${Object.values(i.mat).map(v=>`<td class="border p-1">${v}</td>`).join("")}
 <td class="border p-1">${i.cant}</td>
-<td class="border p-1">${i.total}</td>
+<td class="border p-1">${i.total.toFixed(2)}</td>
 </tr>
 `;
 });
@@ -320,3 +249,4 @@ document.getElementById("total").innerText=suma.toFixed(2);
 </script>
 </body>
 </html>
+
