@@ -9,9 +9,9 @@ import { ProyectoManager } from './components/ProyectoManager';
 import { ConfiguracionManager } from './components/ConfiguracionManager';
 import { Login } from './components/Login';
 import { Sector, AppData, User, Cliente, Material, OrdFabricacion, OrdTrabajo } from './types';
-import { INITIAL_DATA } from './constants';
-import { Loader2, Construction } from 'lucide-react';
-import { syncToSupabase, pullFromSupabase, initSupabase, isSupabaseReady } from './services/supabaseService';
+import { INITIAL_DATA, SUPABASE_URL, SUPABASE_ANON_KEY, COLUMNS } from './constants';
+import { Loader2, Construction, Database } from 'lucide-react';
+import { syncToSupabase, pullFromSupabase, initSupabase, isSupabaseReady, removeFromSupabase } from './services/supabaseService';
 
 const App: React.FC = () => {
   const [activeSector, setActiveSector] = useState<Sector>('DASHBOARD');
@@ -26,28 +26,44 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const sortData = (list: any[], sector: string) => {
+    const columns = COLUMNS[sector];
+    if (!columns || columns.length === 0 || !list) return list;
+    const firstKey = columns[0].key;
+    
+    return [...list].sort((a, b) => {
+      const valA = String(a[firstKey] || '').trim();
+      const valB = String(b[firstKey] || '').trim();
+      return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  };
+
   const [data, setData] = useState<AppData>(() => {
     try {
       const saved = localStorage.getItem('industrial_erp_data');
-      return saved ? JSON.parse(saved) : { ...INITIAL_DATA, CONFIG: {} };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        Object.keys(parsed).forEach(key => {
+          if (Array.isArray(parsed[key])) {
+            parsed[key] = sortData(parsed[key], key);
+          }
+        });
+        return parsed;
+      }
+      return { ...INITIAL_DATA };
     } catch (e) {
-      console.error("Error loading from local storage", e);
-      return { ...INITIAL_DATA, CONFIG: {} };
+      return { ...INITIAL_DATA };
     }
   });
 
   useEffect(() => {
-    if (data.CONFIG.supabaseUrl && data.CONFIG.supabaseAnonKey) {
-      initSupabase(data.CONFIG.supabaseUrl, data.CONFIG.supabaseAnonKey);
-    }
-  }, [data.CONFIG.supabaseUrl, data.CONFIG.supabaseAnonKey]);
+    const url = data.CONFIG?.supabaseUrl || SUPABASE_URL;
+    const key = data.CONFIG?.supabaseAnonKey || SUPABASE_ANON_KEY;
+    initSupabase(url, key);
+  }, [data.CONFIG]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('industrial_erp_data', JSON.stringify(data));
-    } catch (e) {
-      console.error("Storage error", e);
-    }
+    localStorage.setItem('industrial_erp_data', JSON.stringify(data));
   }, [data]);
 
   useEffect(() => {
@@ -60,44 +76,74 @@ const App: React.FC = () => {
 
   const updateTableData = (sector: keyof AppData, newData: any[]) => {
     setIsSyncing(true);
-    setSyncPhase('Guardando cambios...');
+    setSyncPhase('Guardando y Ordenando...');
+    
+    const sorted = sortData(newData, sector);
+
     setData(prev => {
-      const updated = { ...prev, [sector]: newData };
-      setTimeout(() => setIsSyncing(false), 100);
+      const updated = { ...prev, [sector]: sorted };
+      if (isSupabaseReady()) syncToSupabase(updated);
+      setTimeout(() => setIsSyncing(false), 500);
       return updated;
     });
   };
 
-  const updateConfig = (newConfig: Partial<AppData['CONFIG']>) => {
-    setData(prev => ({
-      ...prev,
-      CONFIG: { ...prev.CONFIG, ...newConfig }
-    }));
+  const handleDeleteRecord = async (sector: keyof AppData, idValue: string) => {
+    if (!idValue) return;
+    
+    // Borrado optimista (local primero para rapidez visual)
+    setData(prev => {
+      const newList = (prev[sector] as any[]).filter(item => {
+        const id = item.CODIGO || item.codigo || 
+                   item.COD_CLIENTE || item.cod_cliente || 
+                   item.OF || item.of || 
+                   item.OT || item.ot || 
+                   item.ID || item.id;
+        return String(id).trim() !== String(idValue).trim();
+      });
+      return { ...prev, [sector]: newList };
+    });
+
+    if (isSupabaseReady()) {
+      setIsSyncing(true);
+      setSyncPhase('Actualizando Nube...');
+      const result = await removeFromSupabase(sector as Sector, idValue);
+      if (!result.success) {
+        alert(`Aviso: El registro se eliminó localmente pero no pudo eliminarse de la nube: ${result.error}. Intente sincronizar después.`);
+      }
+      setIsSyncing(false);
+    }
   };
 
   const handleCloudPush = async (customData?: AppData) => {
     setIsSyncing(true);
-    setSyncPhase('Sincronizando con Supabase...');
+    setSyncPhase('Subiendo datos...');
     const targetData = customData || data;
     const result = await syncToSupabase(targetData);
     setIsSyncing(false);
     if (!customData) {
-      if (result.success) alert("✅ Nube actualizada correctamente.");
-      else alert(`❌ Error Cloud: ${result.error}`);
+      if (result.success) alert("✅ Sincronización exitosa.");
+      else alert(`❌ Error: ${result.error}`);
     }
     return result;
   };
 
   const handleCloudPull = async () => {
     setIsSyncing(true);
-    setSyncPhase('Descargando de la nube...');
+    setSyncPhase('Descargando datos...');
     const result = await pullFromSupabase();
     setIsSyncing(false);
     if (result.data) {
-      setData(prev => ({ ...prev, ...result.data }));
-      alert("✅ Datos locales actualizados desde Supabase.");
+      const sortedData: any = { ...result.data };
+      Object.keys(sortedData).forEach(key => {
+        if (Array.isArray(sortedData[key])) {
+          sortedData[key] = sortData(sortedData[key], key);
+        }
+      });
+      setData(prev => ({ ...prev, ...sortedData }));
+      alert("✅ Importación completa.");
     } else {
-      alert(`❌ Error Importación: ${result.error}`);
+      alert(`❌ Error: ${result.error}`);
     }
   };
 
@@ -106,28 +152,27 @@ const App: React.FC = () => {
     setData(prev => {
       const updated = {
         ...prev,
-        MATERIALES: newMaterials,
-        COTIZACIONES: newQuotes || prev.COTIZACIONES
+        MATERIALES: sortData(newMaterials, 'MATERIALES'),
+        COTIZACIONES: newQuotes ? sortData(newQuotes, 'COTIZACIONES') : prev.COTIZACIONES
       };
-      setTimeout(() => setIsSyncing(false), 100);
+      if (isSupabaseReady()) syncToSupabase(updated);
+      setTimeout(() => setIsSyncing(false), 500);
       return updated;
     });
   };
 
   const syncFromDirectory = useCallback(async () => {
     if (!dirHandle && linkedFiles.length === 0) {
-      alert("⚠️ Error: Vincule la carpeta de Base de Datos en CONFIGURACIÓN.");
+      alert("Vincule la carpeta en CONFIGURACIÓN.");
       return;
     }
 
     setIsSyncing(true);
-    setSyncPhase('Analizando archivos Excel...');
+    setSyncPhase('Analizando carpetas...');
 
     try {
-      const tempUpdatedData = { ...data };
-      const foundSectors = new Set<string>();
-      const sectorsProcessed: string[] = [];
-      let totalNewRecords = 0;
+      let tempUpdatedData = { ...data };
+      let totalNew = 0;
       
       const formatExcelDate = (value: any): string => {
         if (!value) return '';
@@ -149,7 +194,6 @@ const App: React.FC = () => {
         else if (fileName.includes('TRABAJO') || fileName.includes('OT')) targetSector = 'ORD_TRABAJOS';
 
         if (!targetSector) return;
-        foundSectors.add(targetSector);
 
         const arrayBuffer = await file.arrayBuffer();
         const workbook = (window as any).XLSX.read(new Uint8Array(arrayBuffer), { type: 'array', cellDates: true });
@@ -158,10 +202,10 @@ const App: React.FC = () => {
         const dataRows = rawRows.slice(1);
 
         let newRecords: any[] = [];
-        const existingData = (data as any)[targetSector] || [];
+        const existingData = (tempUpdatedData as any)[targetSector] || [];
 
         if (targetSector === 'MATERIALES') {
-          const existingCodes = new Set(existingData.map((m: Material) => m.CODIGO));
+          const existingCodes = new Set(existingData.map((m: any) => String(m.CODIGO || m.codigo || '').trim()));
           newRecords = dataRows
             .map(row => ({
               CODIGO: String(row[0] || '').trim(),
@@ -173,7 +217,7 @@ const App: React.FC = () => {
             }))
             .filter(r => r.CODIGO && !existingCodes.has(r.CODIGO));
         } else if (targetSector === 'CLIENTES') {
-          const existingCodes = new Set(existingData.map((c: Cliente) => c.COD_CLIENTE));
+          const existingCodes = new Set(existingData.map((c: any) => String(c.COD_CLIENTE || c.cod_cliente || '').trim()));
           newRecords = dataRows
             .map(row => ({
               COD_CLIENTE: String(row[0] || '').trim(),
@@ -181,7 +225,7 @@ const App: React.FC = () => {
             }))
             .filter(r => r.COD_CLIENTE && !existingCodes.has(r.COD_CLIENTE));
         } else if (targetSector === 'ORD_FABRICACIONES') {
-          const existingCodes = new Set(existingData.map((of: OrdFabricacion) => of.OF));
+          const existingCodes = new Set(existingData.map((of: any) => String(of.OF || of.of || '').trim()));
           newRecords = dataRows
             .map(row => ({
               OF: String(row[1] || '').trim(),
@@ -193,7 +237,7 @@ const App: React.FC = () => {
             }))
             .filter(r => r.OF && !existingCodes.has(r.OF));
         } else if (targetSector === 'ORD_TRABAJOS') {
-          const existingCodes = new Set(existingData.map((ot: OrdTrabajo) => ot.OT));
+          const existingCodes = new Set(existingData.map((ot: any) => String(ot.OT || ot.ot || '').trim()));
           newRecords = dataRows
             .map(row => ({
               OT: String(row[1] || '').trim(),
@@ -204,75 +248,45 @@ const App: React.FC = () => {
         }
 
         if (newRecords.length > 0) {
-          totalNewRecords += newRecords.length;
-          (tempUpdatedData as any)[targetSector] = [...existingData, ...newRecords];
-          sectorsProcessed.push(targetSector);
+          totalNew += newRecords.length;
+          (tempUpdatedData as any)[targetSector] = sortData([...existingData, ...newRecords], targetSector);
         }
       };
 
       const filesToProcess: File[] = [];
       if (dirHandle) {
         for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file') filesToProcess.push(await (entry as FileSystemFileHandle).getFile());
+          if (entry.kind === 'file' && (entry.name.endsWith('.xlsx') || entry.name.endsWith('.xls'))) {
+            filesToProcess.push(await (entry as FileSystemFileHandle).getFile());
+          }
         }
       } else {
-        filesToProcess.push(...linkedFiles);
+        filesToProcess.push(...linkedFiles.filter(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls')));
       }
 
-      if (filesToProcess.length === 0) {
-        alert("❌ No se encontraron archivos en la ubicación seleccionada.");
-        setIsSyncing(false);
-        return;
-      }
+      // Procesar en orden lógico (Clientes antes que OFs)
+      filesToProcess.sort((a, b) => {
+        const priority = (n: string) => {
+          const u = n.toUpperCase();
+          if (u.includes('CLIENTES')) return 1;
+          if (u.includes('MATERIALES')) return 2;
+          if (u.includes('OF')) return 3;
+          if (u.includes('OT')) return 4;
+          return 5;
+        };
+        return priority(a.name) - priority(b.name);
+      });
 
       for (const file of filesToProcess) {
         setSyncPhase(`Procesando ${file.name}...`);
         await processFile(file);
       }
 
-      if (foundSectors.size === 0) {
-        alert("❌ No se detectó ningún archivo válido (MATERIALES, CLIENTES, OF, OT) en la selección.");
-        setIsSyncing(false);
-        return;
-      }
-
-      // Validación de Integridad Referencial (Solo si se cargaron OFs o Clientes nuevos)
-      const allClientCodes = new Set(tempUpdatedData.CLIENTES.map(c => c.COD_CLIENTE));
-      const invalidOFs = tempUpdatedData.ORD_FABRICACIONES.filter(of => !allClientCodes.has(of.COD_CLIENTE));
-      
-      if (invalidOFs.length > 0) {
-        const errorMsg = `⚠️ ERROR DE INTEGRIDAD:\nSe detectaron ${invalidOFs.length} OFs con clientes que no existen en la base de datos.\n\nEjemplo: OF ${invalidOFs[0].OF} -> Cliente ${invalidOFs[0].COD_CLIENTE}\n\nPor favor, actualice primero el archivo de CLIENTES.`;
-        alert(errorMsg);
-        setIsSyncing(false);
-        return;
-      }
-
-      // Si no hay nada nuevo, informar y salir
-      if (totalNewRecords === 0) {
-        alert("ℹ️ Sincronización finalizada: No se encontraron registros nuevos en los archivos analizados.");
-        setIsSyncing(false);
-        return;
-      }
-
-      // Actualizar estado local
       setData(tempUpdatedData);
-
-      // Sincronización con Supabase si está disponible
-      if (isSupabaseReady()) {
-        setSyncPhase('Resguardando en la nube...');
-        const cloudResult = await syncToSupabase(tempUpdatedData);
-        if (cloudResult.success) {
-          alert(`✅ Éxito: Se cargaron ${totalNewRecords} nuevos registros de ${sectorsProcessed.join(', ')} y se resguardaron en la nube.`);
-        } else {
-          alert(`⚠️ Local OK, Nube ERROR:\nSe cargaron ${totalNewRecords} registros localmente, pero falló el respaldo en Supabase: ${cloudResult.error}`);
-        }
-      } else {
-        alert(`✅ Sincronización Local Exitosa:\nSe cargaron ${totalNewRecords} nuevos registros de: ${sectorsProcessed.join(', ')}.\n\n(Configure Supabase para respaldo automático)`);
-      }
-
+      if (isSupabaseReady()) await syncToSupabase(tempUpdatedData);
+      alert(`✅ Sincronización completa: ${totalNew} registros añadidos.`);
     } catch (error) {
-      console.error("Sync error:", error);
-      alert("❌ Error crítico procesando los archivos. Verifique que no estén abiertos en Excel.");
+      alert("❌ Error al procesar archivos.");
     } finally {
       setIsSyncing(false);
       setSyncPhase('');
@@ -284,16 +298,17 @@ const App: React.FC = () => {
     setActiveSector('DASHBOARD');
   };
 
-  if (!currentUser) {
-    return <Login onLogin={setCurrentUser} users={data.USERS} />;
-  }
+  if (!currentUser) return <Login onLogin={setCurrentUser} users={data.USERS} />;
 
   const renderContent = () => {
     if (isSyncing) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <Loader2 className="animate-spin text-blue-600" size={48} />
-          <p className="text-slate-500 font-black uppercase tracking-widest text-xs">{syncPhase}</p>
+        <div className="flex flex-col items-center justify-center h-[60vh] space-y-6">
+          <Loader2 className="animate-spin text-blue-600" size={80} strokeWidth={1} />
+          <div className="text-center">
+            <p className="text-slate-800 font-black uppercase tracking-[0.2em] text-sm mb-2">{syncPhase}</p>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Sincronizando Sistema...</p>
+          </div>
         </div>
       );
     }
@@ -309,36 +324,22 @@ const App: React.FC = () => {
             sector={activeSector} 
             data={data[activeSector as keyof AppData] as any[]} 
             onDataUpdate={(newData) => updateTableData(activeSector as keyof AppData, newData)}
+            onDeleteRecord={(id) => handleDeleteRecord(activeSector as keyof AppData, id)}
           />
         );
       case 'AUTOMATIZACION':
       case 'COTIZACIONES':
-        return (
-          <CotizacionesManager 
-            data={data} 
-            onDataUpdate={(newList) => updateTableData('COTIZACIONES', newList)} 
-          />
-        );
+        return <CotizacionesManager data={data} onDataUpdate={(newList) => updateTableData('COTIZACIONES', newList)} />;
       case 'COMPRAS':
-        return (
-          <ComprasManager 
-            data={data} 
-            onDataUpdate={handleSyncUpdate} 
-          />
-        );
+        return <ComprasManager data={data} onDataUpdate={handleSyncUpdate} />;
       case 'PROYECTO':
-        return (
-          <ProyectoManager 
-            data={data} 
-            onDataUpdate={handleSyncUpdate} 
-          />
-        );
+        return <ProyectoManager data={data} onDataUpdate={handleSyncUpdate} />;
       case 'CONFIGURACION':
         return (
           <ConfiguracionManager 
             data={data}
             onDataUpdate={(newUsers) => updateTableData('USERS', newUsers)}
-            onConfigUpdate={updateConfig}
+            onConfigUpdate={(config) => setData(prev => ({ ...prev, CONFIG: { ...prev.CONFIG, ...config } }))}
             onSetDirHandle={(handle, files, name) => {
               setDirHandle(handle);
               if (files) setLinkedFiles(files);
@@ -351,10 +352,9 @@ const App: React.FC = () => {
           />
         );
       default: return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400 bg-white rounded-[3rem] border border-dashed border-slate-200">
           <Construction size={48} className="mb-4 text-slate-300" />
           <h2 className="text-xl font-bold text-slate-600">Módulo {activeSector}</h2>
-          <p className="max-w-xs text-center mt-2 text-sm">Desarrollo pendiente.</p>
         </div>
       );
     }
