@@ -94,8 +94,11 @@ class AppController {
                         <label class="text-[10px] font-bold text-slate-400">STOCK</label>
                         <input name="en_stock" required type="number" min="0" value="${this.getVal('materiales', 'en_stock') || 0}" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                `, filter(this.data.materiales, this.filters.materiales, ['codigo', 'descripcion']), (m) => `
-                    <td class="p-3 font-mono text-[11px] font-bold text-slate-700">${m.codigo}</td><td class="p-3">${m.descripcion}</td><td class="p-3 font-mono text-blue-600">$${m.precio_un}</td><td class="p-3">${m.en_stock}</td>
+                `, ['CÓDIGO', 'DESCRIPCIÓN', 'PRECIO', 'STOCK'], filter(this.data.materiales, this.filters.materiales, ['codigo', 'descripcion']), (m) => `
+                    <td class="p-3 font-mono text-[11px] font-bold text-slate-700">${m.codigo}</td>
+                    <td class="p-3">${m.descripcion}</td>
+                    <td class="p-3 font-mono text-blue-600">$${m.precio_un}</td>
+                    <td class="p-3">${m.en_stock}</td>
                 `)}
 
                 <!-- CLIENTES -->
@@ -104,8 +107,9 @@ class AppController {
                         <label class="text-[10px] font-bold text-slate-400">RAZÓN SOCIAL</label>
                         <input name="razon_social" required value="${this.getVal('clientes', 'razon_social')}" placeholder="Nombre completo o empresa" class="p-2 bg-white border border-slate-300 rounded">
                     </div>
-                `, filter(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']), (c) => `
-                    <td class="p-3 font-bold text-slate-700">${c.cod_cliente}</td><td class="p-3">${c.razon_social}</td><td class="p-3 italic text-slate-400">-</td><td class="p-3 italic text-slate-400">-</td>
+                `, ['CÓDIGO CLIENTE', 'RAZÓN SOCIAL'], filter(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']), (c) => `
+                    <td class="p-3 font-bold text-slate-700">${c.cod_cliente}</td>
+                    <td class="p-3">${c.razon_social}</td>
                 `)}
 
                 <!-- OF -->
@@ -121,8 +125,10 @@ class AppController {
                             ${this.data.clientes.map(c => `<option value="${c.cod_cliente}" ${this.getVal('ord_fabricaciones', 'cod_cliente') === c.cod_cliente ? 'selected' : ''}>${c.cod_cliente} - ${c.razon_social}</option>`).join('')}
                         </select>
                     </div>
-                `, filter(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of']), (o) => `
-                    <td class="p-3 font-bold text-slate-700">${o.of}</td><td class="p-3">${o.descripcion_of}</td><td class="p-3 text-blue-600 font-medium">${o.cod_cliente}</td><td class="p-3 italic text-slate-400">-</td>
+                `, ['Nº OF', 'PROYECTO / DESCRIPCIÓN', 'CLIENTE VINCULADO'], filter(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of']), (o) => `
+                    <td class="p-3 font-bold text-slate-700">${o.of}</td>
+                    <td class="p-3">${o.descripcion_of}</td>
+                    <td class="p-3 text-blue-600 font-medium">${o.cod_cliente}</td>
                 `)}
 
                 <!-- OT -->
@@ -138,15 +144,19 @@ class AppController {
                             ${this.data.ofs.map(f => `<option value="${f.of}" ${this.getVal('ord_trabajos', 'ofabricaciones') === f.of ? 'selected' : ''}>${f.of} - ${f.descripcion_of}</option>`).join('')}
                         </select>
                     </div>
-                `, filter(this.data.ots, this.filters.ots, ['ot', 'descripcion_ot']), (t) => `
-                    <td class="p-3 font-bold text-slate-700">${t.ot}</td><td class="p-3">${t.descripcion_ot}</td><td class="p-3 font-mono text-indigo-600 font-bold">${t.ofabricaciones}</td><td class="p-3 italic text-slate-400">-</td>
+                `, ['Nº OT', 'TAREA / DETALLE', 'OF VINCULADA'], filter(this.data.ots, this.filters.ots, ['ot', 'descripcion_ot']), (t) => `
+                    <td class="p-3 font-bold text-slate-700">${t.ot}</td>
+                    <td class="p-3">${t.descripcion_ot}</td>
+                    <td class="p-3 font-mono text-indigo-600 font-bold">${t.ofabricaciones}</td>
                 `)}
             </div>
         `;
     }
 
-    renderSection(key, title, color, formId, formFields, list, rowTemplate) {
+    renderSection(key, title, color, formId, formFields, headers, list, rowTemplate) {
         const isEditing = this.editing.table === key;
+        const totalCols = headers.length + 1; // +1 por la columna de acciones
+
         return `
             <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-fadeIn">
                 <div class="flex justify-between items-center mb-6 border-b pb-4">
@@ -171,15 +181,12 @@ class AppController {
                     <table class="w-full text-sm text-left">
                         <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b">
                             <tr>
-                                <th class="p-4">CÓDIGO SISTEMA</th>
-                                <th class="p-4">DESCRIPCIÓN / NOMBRE</th>
-                                <th class="p-4">VINCULACIÓN</th>
-                                <th class="p-4">VALOR / STOCK</th>
+                                ${headers.map(h => `<th class="p-4">${h}</th>`).join('')}
                                 <th class="p-4 text-right">ACCIONES</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            ${list.length === 0 ? `<tr><td colspan="5" class="p-10 text-center text-slate-400 italic">No hay registros disponibles.</td></tr>` : ''}
+                            ${list.length === 0 ? `<tr><td colspan="${totalCols}" class="p-10 text-center text-slate-400 italic">No hay registros disponibles.</td></tr>` : ''}
                             ${list.map(item => `
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     ${rowTemplate(item)}
