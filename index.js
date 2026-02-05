@@ -7,11 +7,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 class AppController {
     constructor() {
         this.currentView = 'BASE_DE_DATOS';
+        this.purchaseSubView = 'INVENTARIO'; // 'INVENTARIO' o 'COTIZACIONES'
         this.supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         this.data = { materiales: [], clientes: [], ofs: [], ots: [], cotizaciones: [] };
-        this.filters = { materiales: '', clientes: '', ofs: '', ots: '' };
+        this.filters = { materiales: '', clientes: '', ofs: '', ots: '', compras_cod: '' };
         this.editing = { table: null, id: null, item: null };
-        this.editingQuoteId = null; // ID de la cotización en edición
+        this.editingQuoteId = null; 
+        this.selectedQuoteForEdit = null; // Para la pestaña compras/cotizaciones
         
         this.draftQuote = {
             ot: '',
@@ -42,6 +44,12 @@ class AppController {
             btn.classList.toggle('active', btn.id === `btn-${viewName}`);
             btn.classList.toggle('bg-slate-800', btn.id === `btn-${viewName}`);
         });
+        this.render();
+    }
+
+    setPurchaseSubView(sub) {
+        this.purchaseSubView = sub;
+        this.selectedQuoteForEdit = null;
         this.render();
     }
 
@@ -76,7 +84,7 @@ class AppController {
                 this.attachMasterListeners();
             },
             'COMPRAS': () => {
-                mount.innerHTML = this.renderPurchasesView(this.data.materiales);
+                mount.innerHTML = this.renderPurchasesView();
             },
             'AUTOMATIZACION': () => {
                 mount.innerHTML = this.renderAutomationView();
@@ -102,6 +110,232 @@ class AppController {
             <h3 class="text-xl font-bold text-slate-400">Módulo ${name}</h3>
             <p class="text-slate-400 italic mt-2">Este componente está siendo configurado según especificaciones técnicas.</p>
         </div>`;
+    }
+
+    // --- MÓDULO COMPRAS ---
+
+    renderPurchasesView() {
+        const filterMats = this.data.materiales.filter(m => 
+            m.codigo.toLowerCase().includes(this.filters.compras_cod.toLowerCase())
+        );
+
+        return `
+            <div class="space-y-6 animate-fadeIn">
+                <!-- Tabs de Compras -->
+                <div class="flex gap-1 bg-slate-200 p-1 rounded-2xl w-fit shadow-inner">
+                    <button onclick="app.setPurchaseSubView('INVENTARIO')" class="px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${this.purchaseSubView === 'INVENTARIO' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}">Inventario Maestro</button>
+                    <button onclick="app.setPurchaseSubView('COTIZACIONES')" class="px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${this.purchaseSubView === 'COTIZACIONES' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}">Precios en Cotizaciones</button>
+                </div>
+
+                ${this.purchaseSubView === 'INVENTARIO' ? this.renderPurchaseInventory(filterMats) : this.renderPurchaseQuotes()}
+            </div>
+        `;
+    }
+
+    renderPurchaseInventory(materials) {
+        return `
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                <div class="p-8 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Control de Precios y Stock</h3>
+                        <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Maestro de materiales registrados</p>
+                    </div>
+                    <div class="relative w-full md:w-80">
+                        <input type="text" placeholder="Filtrar por CÓDIGO..." 
+                            oninput="app.filters.compras_cod = this.value; app.render();" 
+                            value="${this.filters.compras_cod}"
+                            class="w-full pl-4 pr-10 py-3 bg-white text-slate-900 border border-slate-300 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-blue-100 font-bold">
+                        <span class="absolute right-4 top-3.5 text-slate-400">🔍</span>
+                    </div>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
+                        <tr>
+                            <th class="p-6">CÓDIGO</th>
+                            <th class="p-6">MATERIAL</th>
+                            <th class="p-6 text-right">PRECIO MAESTRO ($)</th>
+                            <th class="p-6 text-right">STOCK</th>
+                            <th class="p-6 text-right">GESTIÓN</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        ${materials.map(m => `
+                            <tr class="hover:bg-blue-50/10 transition-all">
+                                <td class="p-6 font-mono text-[11px] font-black text-slate-500">${m.codigo}</td>
+                                <td class="p-6 text-slate-900 text-sm font-bold">${m.descripcion}</td>
+                                <td class="p-6 text-right">
+                                    <input type="number" id="price-${m.id}" step="0.01" value="${m.precio_un}" 
+                                        class="w-32 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-mono font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none">
+                                </td>
+                                <td class="p-6 text-right">
+                                    <input type="number" id="stock-${m.id}" value="${m.en_stock}" 
+                                        class="w-24 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none">
+                                </td>
+                                <td class="p-6 text-right">
+                                    <button onclick="app.savePurchaseRow('${m.id}', '${m.codigo}')" 
+                                        class="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black shadow-lg hover:bg-emerald-600 transition-all uppercase">ACTUALIZAR</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    renderPurchaseQuotes() {
+        return `
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Lista de Cotizaciones -->
+                <div class="lg:col-span-1 space-y-4">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Seleccionar para auditar</h4>
+                    ${this.data.cotizaciones.map(q => `
+                        <button onclick='app.selectQuoteForCostEdit(${JSON.stringify(q).replace(/'/g, "&apos;")})' 
+                            class="w-full text-left p-5 bg-white border ${this.selectedQuoteForEdit?.id === q.id ? 'border-emerald-500 ring-4 ring-emerald-100' : 'border-slate-200'} rounded-3xl hover:shadow-xl transition-all group">
+                            <div class="text-[10px] font-black text-emerald-600 mb-1">${q.codigo_cotizacion}</div>
+                            <div class="text-sm font-black text-slate-800 uppercase mb-3">OT: ${q.ot_codigo}</div>
+                            <div class="flex justify-between items-center text-slate-400">
+                                <span class="text-[10px] font-bold">${new Date(q.created_at).toLocaleDateString()}</span>
+                                <span class="text-lg font-mono font-black text-slate-900">$${parseFloat(q.total_mats).toFixed(2)}</span>
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+
+                <!-- Detalle de materiales de la cotización seleccionada -->
+                <div class="lg:col-span-2">
+                    ${this.selectedQuoteForEdit ? `
+                        <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-fadeIn">
+                            <div class="p-8 bg-emerald-50 border-b border-emerald-100">
+                                <h3 class="text-xl font-black text-emerald-900 uppercase">Auditando: ${this.selectedQuoteForEdit.codigo_cotizacion}</h3>
+                                <p class="text-xs text-emerald-600 font-bold uppercase mt-1">Al actualizar un precio, se sincroniza con el catálogo maestro de materiales.</p>
+                            </div>
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="p-6">MATERIAL</th>
+                                        <th class="p-6 text-center">CANT.</th>
+                                        <th class="p-6 text-right">PRECIO EN COTIZ. ($)</th>
+                                        <th class="p-6 text-right">SUBTOTAL</th>
+                                        <th class="p-6 text-right">ACCIÓN</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    ${this.selectedQuoteForEdit.items_json.map((item, idx) => `
+                                        <tr>
+                                            <td class="p-6">
+                                                <div class="text-xs font-black text-slate-500 mb-0.5">${item.codigo}</div>
+                                                <div class="text-sm font-bold text-slate-800">${item.descripcion}</div>
+                                            </td>
+                                            <td class="p-6 text-center font-black">${item.cantidad}</td>
+                                            <td class="p-6 text-right">
+                                                <input type="number" id="qprice-${idx}" step="0.01" value="${item.precio_un}" 
+                                                    class="w-32 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-mono font-black focus:border-emerald-500 outline-none">
+                                            </td>
+                                            <td class="p-6 text-right font-mono font-black text-blue-600">$${item.subtotal.toFixed(2)}</td>
+                                            <td class="p-6 text-right">
+                                                <button onclick="app.syncQuotePrice(${idx})" class="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg hover:bg-emerald-700 active:scale-90 transition-all">💾</button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                                <tfoot class="bg-slate-900 text-white">
+                                    <tr>
+                                        <td colspan="3" class="p-6 text-right text-[11px] font-black uppercase">Total Neto Cotización</td>
+                                        <td class="p-6 text-right text-2xl font-mono font-black">$${parseFloat(this.selectedQuoteForEdit.total_mats).toFixed(2)}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    ` : `
+                        <div class="h-64 flex flex-col items-center justify-center border-4 border-dashed border-slate-200 rounded-3xl text-slate-300">
+                            <span class="text-6xl mb-4">👈</span>
+                            <span class="font-black uppercase tracking-widest text-sm">Seleccione una cotización para auditar costos</span>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    }
+
+    selectQuoteForCostEdit(q) {
+        this.selectedQuoteForEdit = q;
+        this.render();
+    }
+
+    async syncQuotePrice(idx) {
+        const input = document.getElementById(`qprice-${idx}`);
+        if (!input) return;
+        const newPrice = parseFloat(input.value);
+        if (isNaN(newPrice) || newPrice < 0) return;
+
+        const quote = this.selectedQuoteForEdit;
+        const item = quote.items_json[idx];
+        
+        if (!confirm(`¿Actualizar precio de ${item.descripcion} a $${newPrice}?\nEsta acción afectará al catálogo maestro.`)) return;
+
+        try {
+            // 1. Actualizar Catálogo Maestro (Materiales)
+            const { error: errorMat } = await this.supabase
+                .from('materiales')
+                .update({ precio_un: newPrice })
+                .eq('codigo', item.codigo);
+
+            if (errorMat) throw errorMat;
+
+            // 2. Recalcular Cotización
+            item.precio_un = newPrice;
+            item.subtotal = newPrice * item.cantidad;
+            const newTotal = quote.items_json.reduce((acc, cur) => acc + cur.subtotal, 0);
+
+            const { error: errorQuote } = await this.supabase
+                .from('cotizaciones')
+                .update({ 
+                    items_json: quote.items_json,
+                    total_mats: newTotal
+                })
+                .eq('id', quote.id);
+
+            if (errorQuote) throw errorQuote;
+
+            this.showToast("SINCRONIZACIÓN EXITOSA");
+            this.selectedQuoteForEdit.total_mats = newTotal;
+            await this.refreshData();
+        } catch (err) {
+            console.error(err);
+            alert("Error en sincronización: " + err.message);
+        }
+    }
+
+    async savePurchaseRow(id, codigo) {
+        const priceInput = document.getElementById(`price-${id}`);
+        const stockInput = document.getElementById(`stock-${id}`);
+        if (!priceInput || !stockInput) return;
+        
+        const price = parseFloat(priceInput.value);
+        const stock = parseInt(stockInput.value);
+
+        if (isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
+            this.showToast("VALORES NO VÁLIDOS");
+            return;
+        }
+
+        if (!confirm(`CONFIRMAR CAMBIOS:\nMaterial: ${codigo}\nNuevo Precio: $${price}\nNuevo Stock: ${stock}`)) return;
+
+        const { error } = await this.supabase.from('materiales').update({
+            precio_un: price,
+            en_stock: stock
+        }).eq('id', id);
+
+        if (!error) {
+            this.showToast(`ACTUALIZADO: ${codigo}`);
+            const mat = this.data.materiales.find(m => m.id === id);
+            if (mat) { mat.precio_un = price; mat.en_stock = stock; }
+        } else {
+            alert("Error: " + error.message);
+            await this.refreshData();
+        }
     }
 
     // --- MÓDULO AUTOMATIZACIÓN (MATERIALES + COTIZACIONES) ---
@@ -314,7 +548,6 @@ class AppController {
         }
     }
 
-    // Cargar cotización existente para editar
     loadQuoteForEdit(quote) {
         this.editingQuoteId = quote.id;
         this.draftQuote = {
@@ -368,7 +601,6 @@ class AppController {
             
             let res;
             if (this.editingQuoteId) {
-                // Actualizar cotización existente
                 res = await this.supabase.from('cotizaciones').update({
                     ot_codigo: this.draftQuote.ot,
                     total_mats: total,
@@ -379,7 +611,6 @@ class AppController {
                     this.showToast(`COTIZACIÓN ACTUALIZADA`);
                 }
             } else {
-                // Crear nueva cotización
                 const codigo = await this.generateQuoteCode();
                 const payload = {
                     codigo_cotizacion: codigo,
@@ -545,82 +776,6 @@ class AppController {
                 </div>
             </section>
         `;
-    }
-
-    renderPurchasesView(materials) {
-        return `
-            <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-fadeIn">
-                <div class="p-8 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <div>
-                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Inventario y Precios</h3>
-                        <p class="text-sm text-slate-500 font-bold uppercase tracking-widest text-[10px]">Actualización manual de stock</p>
-                    </div>
-                </div>
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
-                        <tr>
-                            <th class="p-6">CÓDIGO</th>
-                            <th class="p-6">DETALLE DEL MATERIAL</th>
-                            <th class="p-6 text-right">VALOR UNIT. ($)</th>
-                            <th class="p-6 text-right">STOCK</th>
-                            <th class="p-6 text-right">ACCIÓN</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 bg-white">
-                        ${materials.map(m => `
-                            <tr class="hover:bg-blue-50/10 transition-all">
-                                <td class="p-6 font-mono text-[11px] font-black text-slate-500">${m.codigo}</td>
-                                <td class="p-6 text-slate-900 text-sm font-bold">${m.descripcion}</td>
-                                <td class="p-6 text-right">
-                                    <input type="number" id="price-${m.id}" step="0.01" value="${m.precio_un}" 
-                                        class="w-32 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-mono font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
-                                </td>
-                                <td class="p-6 text-right">
-                                    <input type="number" id="stock-${m.id}" value="${m.en_stock}" 
-                                        class="w-24 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
-                                </td>
-                                <td class="p-6 text-right">
-                                    <button onclick="app.savePurchaseRow('${m.id}', '${m.codigo}')" 
-                                        class="px-6 py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black shadow-lg hover:bg-emerald-600 transition-all uppercase tracking-widest">
-                                        ACTUALIZAR
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    async savePurchaseRow(id, codigo) {
-        const priceInput = document.getElementById(`price-${id}`);
-        const stockInput = document.getElementById(`stock-${id}`);
-        if (!priceInput || !stockInput) return;
-        
-        const price = parseFloat(priceInput.value);
-        const stock = parseInt(stockInput.value);
-
-        if (isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
-            this.showToast("VALORES NO VÁLIDOS");
-            return;
-        }
-
-        if (!confirm(`CONFIRMAR CAMBIOS:\nMaterial: ${codigo}\nNuevo Precio: $${price}\nNuevo Stock: ${stock}`)) return;
-
-        const { error } = await this.supabase.from('materiales').update({
-            precio_un: price,
-            en_stock: stock
-        }).eq('id', id);
-
-        if (!error) {
-            this.showToast(`ACTUALIZADO: ${codigo}`);
-            const mat = this.data.materiales.find(m => m.id === id);
-            if (mat) { mat.precio_un = price; mat.en_stock = stock; }
-        } else {
-            alert("Error: " + error.message);
-            await this.refreshData();
-        }
     }
 
     startEdit(table, item) {
