@@ -8,11 +8,12 @@ interface TableManagerProps {
   sector: string;
   data: any[];
   onDataUpdate: (data: any[]) => void;
+  onDeleteRecord?: (id: string) => void;
 }
 
 const ITEMS_PER_PAGE = 20;
 
-export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onDataUpdate }) => {
+export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onDataUpdate, onDeleteRecord }) => {
   const [globalSearch, setGlobalSearch] = useState('');
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [showColumnFilters, setShowColumnFilters] = useState(false);
@@ -22,44 +23,66 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
 
   const columns = COLUMNS[sector] || [];
 
+  // Función robusta para obtener el ID independientemente de si es mayúscula o minúscula
   const getItemId = (item: any) => {
-    return item.CODIGO || item.COD_CLIENTE || item.OF || item.OT || item.ID || JSON.stringify(item);
+    if (!item) return null;
+    const id = item.CODIGO || item.codigo || 
+               item.COD_CLIENTE || item.cod_cliente || 
+               item.OF || item.of || 
+               item.OT || item.ot || 
+               item.ID || item.id;
+    return id ? String(id).trim() : null;
   };
 
-  const filteredData = useMemo(() => {
-    return data.filter(item => {
-      // Fix: Use any cast to ensure Object.values and val can have .toLowerCase() safely via String()
-      const matchesGlobal = (Object.values(item || {}) as any[]).some(val => 
+  const filteredAndSortedData = useMemo(() => {
+    let result = data.filter(item => {
+      const matchesGlobal = Object.values(item || {}).some(val => 
         String(val).toLowerCase().includes(globalSearch.toLowerCase())
       );
       if (!matchesGlobal) return false;
 
-      // Fix: Cast filterValue to string to prevent "toLowerCase on unknown" errors
       return Object.entries(columnFilters).every(([key, filterValue]) => {
         if (!filterValue) return true;
         const itemValue = (item as any)[key];
         return String(itemValue || '').toLowerCase().includes(String(filterValue).toLowerCase());
       });
     });
-  }, [data, globalSearch, columnFilters]);
+
+    if (columns.length > 0) {
+      const firstColKey = columns[0].key;
+      result.sort((a, b) => {
+        const valA = String(a[firstColKey] || '').trim();
+        const valB = String(b[firstColKey] || '').trim();
+        return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }
+
+    return result;
+  }, [data, globalSearch, columnFilters, columns]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredData.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredData, currentPage]);
+    return filteredAndSortedData.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAndSortedData, currentPage]);
 
   const handleEdit = (item: any) => {
-    const originalIndex = data.indexOf(item);
+    const originalIndex = data.findIndex(i => getItemId(i) === getItemId(item));
     setEditingIndex(originalIndex);
     setEditFormData({ ...item });
   };
 
   const handleDelete = (item: any) => {
-    if (confirm('¿Está seguro de que desea eliminar permanentemente este registro del sistema?')) {
-      const originalIndex = data.indexOf(item);
-      if (originalIndex !== -1) {
-        const newData = [...data];
-        newData.splice(originalIndex, 1);
+    const idToDelete = getItemId(item);
+    if (!idToDelete) {
+      alert("No se pudo identificar el ID único de este registro.");
+      return;
+    }
+
+    if (confirm(`¿Eliminar permanentemente el registro "${idToDelete}"?`)) {
+      if (onDeleteRecord) {
+        onDeleteRecord(idToDelete);
+      } else {
+        const newData = data.filter(i => getItemId(i) !== idToDelete);
         onDataUpdate(newData);
       }
     }
@@ -68,6 +91,8 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
   const handleSaveEdit = () => {
     const newData = [...data];
     const processedData = { ...editFormData };
+    
+    // Asegurar tipos numéricos para materiales
     if (sector === 'MATERIALES') {
       processedData.PRECIO_UN = parseFloat(String(processedData.PRECIO_UN)) || 0;
       processedData.EN_STOCK = parseInt(String(processedData.EN_STOCK)) || 0;
@@ -78,6 +103,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
     } else {
       newData.push(processedData);
     }
+    
     onDataUpdate(newData);
     setEditFormData(null);
     setEditingIndex(null);
@@ -100,7 +126,6 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
           <button 
             onClick={() => setShowColumnFilters(!showColumnFilters)}
             className={`p-3 rounded-xl border transition-all ${showColumnFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-            title="Filtros por columna"
           >
             <Filter size={20} />
           </button>
@@ -134,9 +159,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
                 {columns.map(col => (
                   <th key={col.key} className="px-6 py-4">
                     <div className="flex flex-col gap-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {col.label}
-                      </span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{col.label}</span>
                       {showColumnFilters && (
                         <input 
                           type="text"
@@ -153,16 +176,16 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedData.map((item, idx) => (
-                <tr key={getItemId(item) + idx} className="hover:bg-slate-50 transition-colors group">
+                <tr key={getItemId(item) || idx} className="hover:bg-slate-50 transition-colors group">
                   {columns.map(col => (
-                    <td key={col.key} className={`px-6 py-4 text-sm font-bold ${col.key === 'CODIGO' || col.key === 'OF' || col.key === 'OT' ? 'text-blue-600 font-mono' : 'text-slate-700'}`}>
+                    <td key={col.key} className={`px-6 py-4 text-sm font-bold ${['CODIGO', 'codigo', 'OF', 'of', 'OT', 'ot'].includes(col.key) ? 'text-blue-600 font-mono' : 'text-slate-700'}`}>
                       {col.key === 'PRECIO_UN' ? `$${(item[col.key] || 0).toLocaleString()}` : item[col.key]}
                     </td>
                   ))}
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 transition" title="Editar"><Edit3 size={18} /></button>
-                      <button onClick={() => handleDelete(item)} className="p-2 text-slate-400 hover:text-red-500 transition" title="Eliminar"><Trash2 size={18} /></button>
+                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 transition"><Edit3 size={18} /></button>
+                      <button onClick={() => handleDelete(item)} className="p-2 text-slate-400 hover:text-red-500 transition"><Trash2 size={18} /></button>
                     </div>
                   </td>
                 </tr>
@@ -170,7 +193,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
               {paginatedData.length === 0 && (
                 <tr>
                   <td colSpan={columns.length + 1} className="px-6 py-20 text-center text-slate-400 font-bold italic uppercase text-xs tracking-widest">
-                    No se encontraron registros coincidentes.
+                    No se encontraron registros.
                   </td>
                 </tr>
               )}
@@ -185,7 +208,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
             <div className="p-8 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <div>
                 <h3 className="font-black text-slate-800 uppercase tracking-tight">Gestión de {sector}</h3>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Editor de Registro Individual</p>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Editor de Registro</p>
               </div>
               <button onClick={() => setEditFormData(null)} className="p-2 hover:bg-slate-200 rounded-full transition"><X className="text-slate-400" size={24} /></button>
             </div>
@@ -194,7 +217,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
                 <div key={col.key}>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{col.label}</label>
                   <input 
-                    type={col.key === 'PRECIO_UN' || col.key === 'EN_STOCK' ? 'number' : 'text'}
+                    type={['PRECIO_UN', 'EN_STOCK'].includes(col.key) ? 'number' : 'text'}
                     className="w-full px-5 py-3 border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50:focus:border-blue-500 font-black text-slate-700 bg-white transition-all"
                     value={editFormData[col.key] || ''}
                     onChange={(e) => setEditFormData({ ...editFormData, [col.key]: e.target.value })}
@@ -204,7 +227,7 @@ export const TableManager: React.FC<TableManagerProps> = ({ sector, data, onData
             </div>
             <div className="p-8 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
               <button onClick={() => setEditFormData(null)} className="px-6 py-3 text-slate-400 font-black uppercase text-xs">Cancelar</button>
-              <button onClick={handleSaveEdit} className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Guardar Datos</button>
+              <button onClick={handleSaveEdit} className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Guardar</button>
             </div>
           </div>
         </div>
