@@ -155,7 +155,7 @@ class AppController {
 
     renderSection(key, title, color, formId, formFields, headers, list, rowTemplate) {
         const isEditing = this.editing.table === key;
-        const totalCols = headers.length + 1; // +1 por la columna de acciones
+        const totalCols = headers.length + 1;
 
         return `
             <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-fadeIn">
@@ -209,7 +209,7 @@ class AppController {
                 <div class="p-6 bg-slate-50 border-b flex justify-between items-center">
                     <div>
                         <h3 class="font-bold text-slate-800 uppercase tracking-tighter">Inventario / Compras</h3>
-                        <p class="text-xs text-slate-500">Actualización rápida de stock y precios unitarios.</p>
+                        <p class="text-xs text-slate-500">Actualice stock y precios. Requiere confirmación manual por fila.</p>
                     </div>
                 </div>
                 <table class="w-full text-left border-collapse">
@@ -219,22 +219,27 @@ class AppController {
                             <th class="p-4 border-b">DESCRIPCIÓN</th>
                             <th class="p-4 border-b text-right">PRECIO UN ($)</th>
                             <th class="p-4 border-b text-right">STOCK</th>
+                            <th class="p-4 border-b text-right">ACCIONES</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         ${materials.map(m => `
-                            <tr class="hover:bg-slate-50">
+                            <tr class="hover:bg-slate-50 transition-all">
                                 <td class="p-4 font-mono text-[11px] font-bold text-slate-800">${m.codigo}</td>
                                 <td class="p-4 text-slate-600 text-sm">${m.descripcion}</td>
                                 <td class="p-4 text-right">
-                                    <input type="number" min="0" step="0.01" value="${m.precio_un}" 
-                                        onchange="app.updateMaterialField('${m.id}', 'precio_un', this.value, '${m.codigo}')"
-                                        class="w-28 p-1.5 bg-white border border-slate-200 rounded-md text-right font-mono focus:ring-2 focus:ring-blue-400 outline-none">
+                                    <input type="number" id="price-${m.id}" min="0" step="0.01" value="${m.precio_un}" 
+                                        class="w-28 p-1.5 bg-white border border-slate-200 rounded-md text-right font-mono focus:ring-2 focus:ring-blue-400 outline-none transition-all">
                                 </td>
                                 <td class="p-4 text-right">
-                                    <input type="number" min="0" value="${m.en_stock}" 
-                                        onchange="app.updateMaterialField('${m.id}', 'en_stock', this.value, '${m.codigo}')"
-                                        class="w-24 p-1.5 bg-white border border-slate-200 rounded-md text-right focus:ring-2 focus:ring-blue-400 outline-none">
+                                    <input type="number" id="stock-${m.id}" min="0" value="${m.en_stock}" 
+                                        class="w-24 p-1.5 bg-white border border-slate-200 rounded-md text-right focus:ring-2 focus:ring-blue-400 outline-none transition-all">
+                                </td>
+                                <td class="p-4 text-right">
+                                    <button onclick="app.savePurchaseRow('${m.id}', '${m.codigo}')" 
+                                        class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold shadow-md hover:bg-emerald-700 active:scale-95 transition-all">
+                                        💾 GUARDAR
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -242,6 +247,39 @@ class AppController {
                 </table>
             </div>
         `;
+    }
+
+    async savePurchaseRow(id, codigo) {
+        const priceInput = document.getElementById(`price-${id}`);
+        const stockInput = document.getElementById(`stock-${id}`);
+        
+        const price = parseFloat(priceInput.value);
+        const stock = parseInt(stockInput.value);
+
+        if (isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
+            this.showToast("Valores inválidos");
+            return;
+        }
+
+        if (!confirm(`¿Confirma actualización de Material ${codigo}?\nPrecio: $${price}\nStock: ${stock}`)) return;
+
+        const { error } = await this.supabase.from('materiales').update({
+            precio_un: price,
+            en_stock: stock
+        }).eq('id', id);
+
+        if (!error) {
+            this.showToast("Sincronizado correctamente");
+            // Actualización silenciosa de los datos locales
+            const mat = this.data.materiales.find(m => m.id === id);
+            if (mat) {
+                mat.precio_un = price;
+                mat.en_stock = stock;
+            }
+        } else {
+            alert("Error al actualizar: " + error.message);
+            await this.refreshData();
+        }
     }
 
     startEdit(table, item) {
@@ -312,25 +350,6 @@ class AppController {
         });
     }
 
-    async updateMaterialField(id, field, value, codigo) {
-        const numValue = parseFloat(value);
-        if (isNaN(numValue) || numValue < 0) {
-            this.showToast("Valor No Válido");
-            await this.refreshData();
-            return;
-        }
-        const obj = {}; obj[field] = numValue;
-        const { error } = await this.supabase.from('materiales').update(obj).eq('id', id);
-        if (!error) {
-            this.showToast(`Material ${codigo} actualizado`);
-            const mat = this.data.materiales.find(m => m.id === id);
-            if (mat) mat[field] = numValue;
-        } else {
-            this.showToast("Error de Red");
-            await this.refreshData();
-        }
-    }
-
     showToast(msg) {
         const t = document.getElementById('toast');
         const m = document.getElementById('toast-msg');
@@ -346,4 +365,3 @@ class AppController {
 }
 
 window.app = new AppController();
-
