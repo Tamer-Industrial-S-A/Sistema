@@ -12,6 +12,10 @@
         .sidebar-item.active { background-color: #1e293b; color: white; border-left: 4px solid #3b82f6; }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom scrollbar for sidebar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-900 overflow-hidden h-screen flex">
@@ -26,7 +30,7 @@
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
             <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Maestros</div>
             <button onclick="app.setView('BASE_DE_DATOS')" id="btn-BASE_DE_DATOS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Gestión de Registros</span>
+                <span>Base de Datos</span>
             </button>
             <div class="h-px bg-slate-800 my-4"></div>
             <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Operaciones</div>
@@ -34,14 +38,21 @@
                 <span>Compras / Inventario</span>
             </button>
             <div class="h-px bg-slate-800 my-4"></div>
-            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Módulos</div>
+            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Ingeniería y Gestión</div>
             <button onclick="app.setView('AUTOMATIZACION')" id="btn-AUTOMATIZACION" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Automatizacion</span>
+                <span>Automatización</span>
             </button>
-            <div class="h-px bg-slate-800 my-4"></div>
             <button onclick="app.setView('TECNICA')" id="btn-TECNICA" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
                 <span>Técnica</span>
             </button>
+            <button onclick="app.setView('PLANEAMIENTO')" id="btn-PLANEAMIENTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Planeamiento</span>
+            </button>
+            <button onclick="app.setView('PROYECTO')" id="btn-PROYECTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Proyecto</span>
+            </button>
+            <div class="h-px bg-slate-800 my-4"></div>
+            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Producción</div>
             <button onclick="app.setView('CORTE_CON_AGUA')" id="btn-CORTE_CON_AGUA" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
                 <span>Corte con Agua</span>
             </button>
@@ -61,11 +72,11 @@
             </div>
         </header>
 
-        <div id="content-mount" class="flex-1 overflow-y-auto p-8">
+        <div id="content-mount" class="flex-1 overflow-y-auto p-8 bg-slate-50/50">
             <!-- Contenido dinámico aquí -->
         </div>
 
-        <div id="toast" class="fixed bottom-8 right-8 opacity-0 transition-all duration-300 pointer-events-none z-50">
+        <div id="toast" class="fixed bottom-8 right-8 opacity-0 translate-y-6 transition-all duration-300 pointer-events-none z-50">
             <div class="bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl text-sm font-bold border-l-4 border-blue-500 flex items-center gap-3">
                 <span id="toast-msg"></span>
             </div>
