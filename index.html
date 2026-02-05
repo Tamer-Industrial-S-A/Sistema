@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +6,7 @@
     <title>TAMER INDUSTRIAL - ERP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- Polyfill para Import Maps -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 <script type="importmap">
 {
@@ -25,7 +25,6 @@
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
-    <!-- Punto de entrada principal -->
-    <script type="module" src="/index.tsx"></script>
+    <!-- No incluir index.tsx manualmente aquí; el sistema lo importa automáticamente -->
 </body>
 </html>
