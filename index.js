@@ -36,7 +36,8 @@ class AppController {
 
     setView(viewName) {
         this.currentView = viewName;
-        document.getElementById('view-title').innerText = viewName.replace(/_/g, ' ');
+        const viewTitle = document.getElementById('view-title');
+        if (viewTitle) viewTitle.innerText = viewName.replace(/_/g, ' ');
         document.querySelectorAll('.sidebar-item').forEach(btn => {
             btn.classList.toggle('active', btn.id === `btn-${viewName}`);
             btn.classList.toggle('bg-slate-800', btn.id === `btn-${viewName}`);
@@ -185,7 +186,7 @@ class AppController {
                         ${this.data.cotizaciones.map(q => `
                             <div class="p-4 border border-slate-100 bg-slate-50 rounded-xl hover:shadow-md transition-all cursor-default relative group">
                                 <button onclick="app.deleteQuote('${q.id}')" class="absolute top-2 right-2 p-2 bg-white rounded-lg text-rose-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">🗑️</button>
-                                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cotización #${q.id.slice(0,8)}</div>
+                                <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">${q.codigo_cotizacion || 'SIN CÓDIGO'}</div>
                                 <div class="text-sm font-bold text-slate-800 mb-2">OT: ${q.ot_codigo}</div>
                                 <div class="flex justify-between items-end border-t border-slate-200 pt-2 mt-2">
                                     <div class="text-[10px] text-slate-500">${new Date(q.created_at).toLocaleDateString()}</div>
@@ -207,13 +208,13 @@ class AppController {
 
     addMaterialToQuote() {
         const select = document.getElementById('material-picker');
+        if (!select) return;
         const id = select.value;
         if (!id) return;
 
         const mat = this.data.materiales.find(m => m.id === id);
         if (!mat) return;
 
-        // Evitar duplicados
         const exists = this.draftQuote.items.find(i => i.id_material === id);
         if (exists) {
             exists.cantidad += 1;
@@ -253,6 +254,30 @@ class AppController {
         }
     }
 
+    async generateQuoteCode() {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        const datePart = `${dd}-${mm}-${yyyy}`;
+        
+        // Obtener el conteo de hoy desde Supabase para determinar el incremental
+        const todayStart = new Date(now.setHours(0,0,0,0)).toISOString();
+        const { count, error } = await this.supabase
+            .from('cotizaciones')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', todayStart);
+            
+        if (error) {
+            console.error("Error obteniendo secuencia:", error);
+            // Fallback en caso de error: usa un timestamp corto
+            return `COT-${datePart}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+        }
+
+        const nextNum = (count + 1).toString().padStart(4, '0');
+        return `COT-${datePart}-${nextNum}`;
+    }
+
     async saveQuote() {
         if (!this.draftQuote.ot) {
             alert("Debe seleccionar una OT vinculada.");
@@ -263,20 +288,30 @@ class AppController {
             return;
         }
 
-        const total = this.draftQuote.items.reduce((acc, i) => acc + i.subtotal, 0);
+        try {
+            const total = this.draftQuote.items.reduce((acc, i) => acc + i.subtotal, 0);
+            const codigoCotiz = await this.generateQuoteCode();
 
-        const { data, error } = await this.supabase.from('cotizaciones').insert([{
-            ot_codigo: this.draftQuote.ot,
-            total_mats: total,
-            items_json: this.draftQuote.items
-        }]);
+            const payload = {
+                codigo_cotizacion: codigoCotiz,
+                ot_codigo: this.draftQuote.ot,
+                total_mats: total,
+                items_json: this.draftQuote.items
+            };
 
-        if (!error) {
-            this.showToast("Cotización guardada");
-            this.draftQuote = { ot: '', items: [] };
-            await this.refreshData();
-        } else {
-            alert("Error al guardar cotización: " + error.message);
+            const { data, error } = await this.supabase.from('cotizaciones').insert([payload]);
+
+            if (!error) {
+                this.showToast(`Cotización ${codigoCotiz} guardada`);
+                this.draftQuote = { ot: '', items: [] };
+                await this.refreshData();
+            } else {
+                console.error("Supabase Save Error:", error);
+                alert("Error al guardar cotización: " + error.message);
+            }
+        } catch (err) {
+            console.error("System Save Error:", err);
+            alert("Ocurrió un error inesperado al intentar guardar.");
         }
     }
 
@@ -475,6 +510,7 @@ class AppController {
     async savePurchaseRow(id, codigo) {
         const priceInput = document.getElementById(`price-${id}`);
         const stockInput = document.getElementById(`stock-${id}`);
+        if (!priceInput || !stockInput) return;
         
         const price = parseFloat(priceInput.value);
         const stock = parseInt(stockInput.value);
@@ -508,7 +544,8 @@ class AppController {
     startEdit(table, item) {
         this.editing = { table, id: item.id, item: { ...item } };
         this.render();
-        const form = document.getElementById(this.getFormId(table));
+        const formId = this.getFormId(table);
+        const form = document.getElementById(formId);
         if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
