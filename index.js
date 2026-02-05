@@ -9,11 +9,10 @@ class AppController {
     constructor() {
         this.currentView = 'BASE_DE_DATOS';
         this.supabase = null;
-        
-        // Inicializar la conexión
+        this.data = { materiales: [], clientes: [], ofs: [], ots: [] };
+        this.filters = { materiales: '', clientes: '', ofs: '', ots: '' };
+        this.editing = { table: null, id: null };
         this.initSupabase();
-        
-        // Primera carga de vista
         this.setView(this.currentView);
     }
 
@@ -32,11 +31,11 @@ class AppController {
         const text = document.getElementById('status-text');
         if (!dot || !text) return;
         if (status === 'online') {
-            dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-            text.innerText = 'Conectado a Supabase';
+            dot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]';
+            text.innerText = 'Sincronizado';
         } else {
             dot.className = 'w-2 h-2 rounded-full bg-rose-500';
-            text.innerText = 'Desconectado';
+            text.innerText = 'Sin conexión';
         }
     }
 
@@ -45,98 +44,169 @@ class AppController {
         const titleEl = document.getElementById('view-title');
         if (titleEl) titleEl.innerText = viewName.replace(/_/g, ' ');
         
-        // Actualizar UI sidebar
         document.querySelectorAll('.sidebar-item').forEach(btn => {
             btn.classList.remove('active', 'bg-slate-800', 'text-white');
-            if (btn.id === `btn-${viewName}`) {
-                btn.classList.add('active', 'bg-slate-800', 'text-white');
-            }
+            if (btn.id === `btn-${viewName}`) btn.classList.add('active', 'bg-slate-800', 'text-white');
         });
-
         this.render();
     }
 
-    async render() {
-        const mount = document.getElementById('content-mount');
-        if (!mount) return;
-        
-        mount.innerHTML = `<div class="flex items-center justify-center h-64"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div></div>`;
-
-        switch(this.currentView) {
-            case 'BASE_DE_DATOS':
-                mount.innerHTML = this.renderDatabaseView();
-                break;
-            case 'AUTOMATIZACION':
-                mount.innerHTML = this.renderAutomationView();
-                this.attachAutomationListeners();
-                break;
-            case 'COMPRAS':
-                const materials = await this.fetchTable('materiales');
-                mount.innerHTML = this.renderPurchasesView(materials);
-                break;
-            case 'PLANEAMIENTO':
-                const clientes = await this.fetchTable('clientes');
-                const ofs = await this.fetchTable('ord_fabricaciones');
-                mount.innerHTML = this.renderPlaneamientoView(clientes, ofs);
-                this.attachPlaneamientoListeners();
-                break;
-            case 'PROYECTO':
-                const ots = await this.fetchTable('ord_trabajos');
-                mount.innerHTML = this.renderProyectoView(ots);
-                this.attachProyectoListeners();
-                break;
-            default:
-                mount.innerHTML = this.renderPlaceholder();
-                break;
-        }
-    }
-
-    // --- FETCH DATA ---
     async fetchTable(tableName) {
         try {
             const { data, error } = await this.supabase.from(tableName).select('*').order('created_at', { ascending: false });
             if (error) throw error;
             return data;
         } catch (err) {
-            this.showToast('Error cargando ' + tableName, 'error');
+            console.error(err);
             return [];
         }
     }
 
-    // --- RENDERS ---
-    renderDatabaseView() {
+    async render() {
+        const mount = document.getElementById('content-mount');
+        if (!mount) return;
+
+        if (this.currentView === 'BASE_DE_DATOS') {
+            this.data.materiales = await this.fetchTable('materiales');
+            this.data.clientes = await this.fetchTable('clientes');
+            this.data.ofs = await this.fetchTable('ord_fabricaciones');
+            this.data.ots = await this.fetchTable('ord_trabajos');
+            mount.innerHTML = this.renderMasterDatabase();
+            this.attachMasterListeners();
+        } else if (this.currentView === 'COMPRAS') {
+            this.data.materiales = await this.fetchTable('materiales');
+            mount.innerHTML = this.renderPurchasesView(this.data.materiales);
+        } else {
+            mount.innerHTML = this.renderPlaceholder();
+        }
+    }
+
+    renderMasterDatabase() {
+        const filterData = (list, query, keys) => {
+            if (!query) return list;
+            const q = query.toLowerCase();
+            return list.filter(item => keys.some(key => String(item[key] || '').toLowerCase().includes(q)));
+        };
+
+        const fMaterials = filterData(this.data.materiales, this.filters.materiales, ['codigo', 'descripcion']);
+        const fClients = filterData(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']);
+        const fOfs = filterData(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of', 'cod_cliente']);
+        const fOts = filterData(this.data.ots, this.filters.ots, ['ot', 'descripcion_ot', 'ofabricaciones']);
+
         return `
-            <div class="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                    <h3 class="text-xl font-bold mb-4">Configuración de Base de Datos</h3>
-                    <p class="text-slate-500 mb-6 italic text-sm">Los datos están hardcoded en index.js para conexión automática.</p>
-                    <div class="space-y-3">
-                        <div class="p-3 bg-white rounded border border-slate-200 font-mono text-xs break-all text-slate-800">URL: ${SUPABASE_URL}</div>
-                        <div class="p-3 bg-white rounded border border-slate-200 font-mono text-xs break-all text-slate-800">KEY: ${SUPABASE_KEY.substring(0, 30)}...</div>
-                    </div>
-                </div>
+            <div class="space-y-12 animate-fadeIn pb-20">
+                ${this.renderSection('materiales', 'MATERIALES', 'blue', 'form-material', `
+                    <input name="codigo" required placeholder="CÓDIGO" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="descripcion" required placeholder="DESCRIPCIÓN" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="precio_un" required type="number" min="0" step="0.01" placeholder="PRECIO UN." class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="en_stock" required type="number" min="0" placeholder="STOCK" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                `, fMaterials, ['Código', 'Descripción', 'Precio', 'Stock'], (m) => `
+                    <td class="p-3 font-bold text-slate-800">${m.codigo}</td>
+                    <td class="p-3 text-slate-600">${m.descripcion}</td>
+                    <td class="p-3 text-slate-800 font-mono">$${parseFloat(m.precio_un).toFixed(2)}</td>
+                    <td class="p-3 text-slate-800">${m.en_stock}</td>
+                `)}
+
+                ${this.renderSection('clientes', 'CLIENTES', 'emerald', 'form-cliente', `
+                    <input name="cod_cliente" required placeholder="CÓDIGO CLIENTE" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="razon_social" required placeholder="RAZÓN SOCIAL" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                `, fClients, ['Código', 'Razón Social'], (c) => `
+                    <td class="p-3 font-bold text-slate-800">${c.cod_cliente}</td>
+                    <td class="p-3 text-slate-600">${c.razon_social}</td>
+                `)}
+
+                ${this.renderSection('ord_fabricaciones', 'ORDENES DE FABRICACIÓN (OF)', 'amber', 'form-of', `
+                    <input name="of" required placeholder="NÚMERO OF" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="descripcion_of" required placeholder="DESCRIPCIÓN" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <select name="cod_cliente" required class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccionar Cliente...</option>
+                        ${this.data.clientes.map(c => `<option value="${c.cod_cliente}">${c.razon_social}</option>`).join('')}
+                    </select>
+                `, fOfs, ['OF', 'Descripción', 'Cliente'], (o) => `
+                    <td class="p-3 font-bold text-slate-800">${o.of}</td>
+                    <td class="p-3 text-slate-600">${o.descripcion_of}</td>
+                    <td class="p-3 text-blue-600 font-medium">${o.cod_cliente}</td>
+                `)}
+
+                ${this.renderSection('ord_trabajos', 'ORDENES DE TRABAJO (OT)', 'indigo', 'form-ot', `
+                    <input name="ot" required placeholder="NÚMERO OT" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <input name="descripcion_ot" required placeholder="DETALLE" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                    <select name="ofabricaciones" required class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Vincular a OF...</option>
+                        ${this.data.ofs.map(f => `<option value="${f.of}">${f.of} - ${f.descripcion_of}</option>`).join('')}
+                    </select>
+                `, fOts, ['OT', 'Descripción', 'OF Vinculada'], (t) => `
+                    <td class="p-3 font-bold text-slate-800">${t.ot}</td>
+                    <td class="p-3 text-slate-600">${t.descripcion_ot}</td>
+                    <td class="p-3 font-mono text-indigo-600 font-medium">${t.ofabricaciones}</td>
+                `)}
             </div>
         `;
     }
 
-    renderAutomationView() {
+    renderSection(key, title, color, formId, formFields, list, headers, rowTemplate) {
+        const isEditing = this.editing.table === key;
+        const filterVal = this.filters[key] || '';
+        
         return `
-            <div class="max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 animate-fadeIn">
-                <h3 class="text-xl font-bold mb-6 text-slate-800">Crear Nuevo Material</h3>
-                <form id="form-material" class="space-y-4">
-                    <input name="codigo" required placeholder="CÓDIGO (Ej: MAT-01)" class="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    <input name="descripcion" required placeholder="DESCRIPCIÓN" class="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    <input name="precio_un" required type="number" step="0.01" placeholder="PRECIO UNITARIO" class="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    <input name="en_stock" required type="number" placeholder="STOCK INICIAL" class="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">Guardar Material</button>
+            <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b pb-4">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2 h-6 bg-${color}-500 rounded"></span> ${title}
+                    </h3>
+                    <div class="relative max-w-xs w-full">
+                        <input type="text" placeholder="Buscar..." value="${filterVal}" oninput="app.setFilter('${key}', this.value)" class="w-full pl-9 pr-4 py-2 bg-slate-50 text-sm text-slate-900 border border-slate-200 rounded-full focus:ring-2 focus:ring-blue-500 outline-none">
+                        <span class="absolute left-3 top-2.5">🔍</span>
+                    </div>
+                </div>
+
+                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    ${formFields}
+                    <div class="md:col-span-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-${isEditing ? 'amber' : 'blue'}-600 text-white p-2 rounded font-bold hover:bg-${isEditing ? 'amber' : 'blue'}-700 transition-colors">
+                            ${isEditing ? '✓ ACTUALIZAR REGISTRO' : '+ AÑADIR REGISTRO'}
+                        </button>
+                        ${isEditing ? `<button type="button" onclick="app.cancelEdit()" class="px-4 bg-slate-200 text-slate-700 p-2 rounded font-bold hover:bg-slate-300">CANCELAR</button>` : ''}
+                    </div>
                 </form>
-            </div>
+
+                <div class="overflow-x-auto border rounded-xl">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+                            <tr>
+                                ${headers.map(h => `<th class="p-3">${h}</th>`).join('')}
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${list.length === 0 ? `<tr><td colspan="${headers.length + 1}" class="p-8 text-center text-slate-400 italic">Sin resultados.</td></tr>` : ''}
+                            ${list.map((item, idx) => {
+                                // Guardamos el objeto en una variable temporal para evitar problemas de escape en el HTML
+                                const itemStr = btoa(unescape(encodeURIComponent(JSON.stringify(item))));
+                                return `
+                                    <tr class="border-t hover:bg-slate-50 transition-colors">
+                                        ${rowTemplate(item)}
+                                        <td class="p-3 text-right space-x-2">
+                                            <button onclick="app.handleEditBtn('${key}', '${itemStr}')" class="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="Editar">✏️</button>
+                                            <button onclick="app.deleteRecord('${key}', '${item.id}')" class="text-rose-600 hover:bg-rose-50 p-2 rounded-lg transition-colors" title="Eliminar">🗑️</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         `;
     }
 
     renderPurchasesView(materials) {
         return `
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fadeIn">
+                <div class="p-6 bg-slate-50 border-b">
+                    <h3 class="font-bold text-slate-800">Compras / Inventario</h3>
+                    <p class="text-xs text-slate-500">Edición rápida de precios y stock con confirmación.</p>
+                </div>
                 <table class="w-full text-left border-collapse">
                     <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
                         <tr>
@@ -148,17 +218,17 @@ class AppController {
                     </thead>
                     <tbody>
                         ${materials.map(m => `
-                            <tr class="hover:bg-slate-50">
-                                <td class="p-4 border-b font-bold text-slate-800">${m.codigo}</td>
-                                <td class="p-4 border-b text-slate-700">${m.descripcion}</td>
-                                <td class="p-4 border-b">
-                                    <input type="number" step="0.01" value="${m.precio_un}" 
-                                        onchange="app.updateField('materiales', '${m.id}', 'precio_un', this.value)"
+                            <tr class="hover:bg-slate-50 border-b last:border-0">
+                                <td class="p-4 font-bold text-slate-800">${m.codigo}</td>
+                                <td class="p-4 text-slate-700">${m.descripcion}</td>
+                                <td class="p-4">
+                                    <input type="number" min="0" step="0.01" value="${m.precio_un}" 
+                                        onchange="app.updateMaterialField('${m.id}', 'precio_un', this.value, '${m.codigo}')"
                                         class="w-24 p-1 bg-white text-slate-900 border border-slate-300 rounded text-right focus:ring-2 focus:ring-blue-400 outline-none">
                                 </td>
-                                <td class="p-4 border-b">
-                                    <input type="number" value="${m.en_stock}" 
-                                        onchange="app.updateField('materiales', '${m.id}', 'en_stock', this.value)"
+                                <td class="p-4">
+                                    <input type="number" min="0" value="${m.en_stock}" 
+                                        onchange="app.updateMaterialField('${m.id}', 'en_stock', this.value, '${m.codigo}')"
                                         class="w-24 p-1 bg-white text-slate-900 border border-slate-300 rounded text-right focus:ring-2 focus:ring-blue-400 outline-none">
                                 </td>
                             </tr>
@@ -169,116 +239,109 @@ class AppController {
         `;
     }
 
-    renderPlaneamientoView(clientes, ofs) {
-        return `
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h4 class="font-bold mb-4 text-slate-800 border-b pb-2">Registrar Cliente</h4>
-                    <form id="form-cliente" class="space-y-3">
-                        <input name="cod_cliente" required placeholder="CÓDIGO CLIENTE" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <input name="razon_social" required placeholder="RAZÓN SOCIAL" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <button class="w-full bg-slate-900 text-white p-2 rounded hover:bg-slate-800 transition-colors">Guardar Cliente</button>
-                    </form>
-                </div>
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h4 class="font-bold mb-4 text-slate-800 border-b pb-2">Registrar OF (Ord. Fabricación)</h4>
-                    <form id="form-of" class="space-y-3">
-                        <input name="of" required placeholder="NÚMERO OF" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <input name="descripcion_of" required placeholder="DESCRIPCIÓN PROYECTO" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <select name="cod_cliente" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Seleccionar Cliente...</option>
-                            ${clientes.map(c => `<option value="${c.cod_cliente}">${c.razon_social} (${c.cod_cliente})</option>`).join('')}
-                        </select>
-                        <button class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors">Guardar OF</button>
-                    </form>
-                </div>
-            </div>
-        `;
-    }
-
-    renderProyectoView(ots) {
-        return `
-            <div class="space-y-6 animate-fadeIn">
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 max-w-xl mx-auto shadow-sm">
-                    <h4 class="font-bold mb-4 text-slate-800 border-b pb-2">Nueva OT (Orden de Trabajo)</h4>
-                    <form id="form-ot" class="space-y-3">
-                        <input name="ot" required placeholder="NÚMERO OT" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <input name="descripcion_ot" required placeholder="DETALLE DEL TRABAJO" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <input name="ofabricaciones" required placeholder="VINCULAR A OF" class="w-full p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
-                        <button class="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 transition-colors">Crear OT</button>
-                    </form>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-4 bg-slate-50 font-bold border-b text-slate-800">Lista de Proyectos (OTs)</div>
-                    <table class="w-full text-sm">
-                        <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
-                            <tr><th class="p-3 text-left">OT</th><th class="p-3 text-left">Descripción</th><th class="p-3 text-left">OF Vinculada</th></tr>
-                        </thead>
-                        <tbody>
-                            ${ots.map(o => `<tr class="hover:bg-slate-50"><td class="p-3 border-b font-bold text-slate-800">${o.ot}</td><td class="p-3 border-b text-slate-700">${o.descripcion_ot}</td><td class="p-3 border-b font-mono text-blue-600">${o.ofabricaciones}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-
     renderPlaceholder() {
-        return `<div class="p-20 text-center text-slate-400">Módulo ${this.currentView} en construcción...</div>`;
+        return `<div class="p-20 text-center text-slate-400 animate-fadeIn italic">El módulo ${this.currentView.replace(/_/g, ' ')} se encuentra actualmente en desarrollo. Por favor, utilice el módulo de GESTIÓN DE REGISTROS.</div>`;
     }
 
-    // --- LISTENERS ---
-    attachAutomationListeners() {
-        const form = document.getElementById('form-material');
-        if (!form) return;
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(form).entries());
-            const { error } = await this.supabase.from('materiales').insert([{ 
-                codigo: data.codigo, 
-                descripcion: data.descripcion, 
-                precio_un: parseFloat(data.precio_un), 
-                en_stock: parseInt(data.en_stock) 
-            }]);
-            if (!error) { this.showToast('Material guardado'); form.reset(); }
-        };
+    // --- ACCIONES DE DATOS ---
+    setFilter(key, value) {
+        this.filters[key] = value;
+        if (this._filterTimeout) clearTimeout(this._filterTimeout);
+        this._filterTimeout = setTimeout(() => this.render(), 150);
     }
 
-    attachPlaneamientoListeners() {
-        const fClient = document.getElementById('form-cliente');
-        if (fClient) fClient.onsubmit = async (e) => {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(fClient).entries());
-            await this.supabase.from('clientes').insert([data]);
-            this.showToast('Cliente guardado');
+    handleEditBtn(tableKey, encodedItem) {
+        try {
+            const item = JSON.parse(decodeURIComponent(escape(atob(encodedItem))));
+            this.startEdit(tableKey, item);
+        } catch(e) { console.error("Error al decodificar item para editar", e); }
+    }
+
+    startEdit(tableKey, item) {
+        this.editing = { table: tableKey, id: item.id };
+        this.render();
+        const formId = this.getFormId(tableKey);
+        const form = document.getElementById(formId);
+        if (form) {
+            Object.keys(item).forEach(key => {
+                if (form.elements[key]) form.elements[key].value = item[key];
+            });
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    cancelEdit() {
+        this.editing = { table: null, id: null };
+        this.render();
+    }
+
+    async deleteRecord(table, id) {
+        if (!confirm('¿CONFIRMAR ELIMINACIÓN? Esta acción borrará el registro de forma permanente en la base de datos.')) return;
+        const { error } = await this.supabase.from(table).delete().eq('id', id);
+        if (!error) {
+            this.showToast('Registro eliminado exitosamente');
             this.render();
-        };
-
-        const fOf = document.getElementById('form-of');
-        if (fOf) fOf.onsubmit = async (e) => {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(fOf).entries());
-            await this.supabase.from('ord_fabricaciones').insert([data]);
-            this.showToast('OF Guardada');
-            this.render();
-        };
+        } else {
+            this.showToast('Error: El registro podría estar siendo usado en otra tabla.');
+        }
     }
 
-    attachProyectoListeners() {
-        const fOt = document.getElementById('form-ot');
-        if (fOt) fOt.onsubmit = async (e) => {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(fOt).entries());
-            await this.supabase.from('ord_trabajos').insert([data]);
-            this.showToast('OT Generada');
-            this.render();
-        };
+    getFormId(tableKey) {
+        const map = { 'materiales': 'form-material', 'clientes': 'form-cliente', 'ord_fabricaciones': 'form-of', 'ord_trabajos': 'form-ot' };
+        return map[tableKey] || '';
     }
 
-    async updateField(table, id, field, value) {
-        const obj = {}; obj[field] = value;
-        const { error } = await this.supabase.from(table).update(obj).eq('id', id);
-        if (!error) this.showToast('Sincronizado');
+    attachMasterListeners() {
+        const forms = [
+            { id: 'form-material', table: 'materiales', transform: (d) => ({ ...d, precio_un: parseFloat(d.precio_un), en_stock: parseInt(d.en_stock) }) },
+            { id: 'form-cliente', table: 'clientes' },
+            { id: 'form-of', table: 'ord_fabricaciones' },
+            { id: 'form-ot', table: 'ord_trabajos' }
+        ];
+
+        forms.forEach(f => {
+            const form = document.getElementById(f.id);
+            if (!form) return;
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const raw = Object.fromEntries(new FormData(form).entries());
+                const data = f.transform ? f.transform(raw) : raw;
+                
+                let res;
+                if (this.editing.table === f.table && this.editing.id) {
+                    res = await this.supabase.from(f.table).update(data).eq('id', this.editing.id);
+                } else {
+                    res = await this.supabase.from(f.table).insert([data]);
+                }
+
+                if (!res.error) {
+                    this.showToast(this.editing.id ? 'Cambios guardados correctamente' : 'Nuevo registro creado');
+                    this.editing = { table: null, id: null };
+                    form.reset();
+                    this.render();
+                } else {
+                    this.showToast('Error al procesar: ' + res.error.message);
+                }
+            };
+        });
+    }
+
+    async updateMaterialField(id, field, value, codigo) {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || numValue < 0) {
+            this.showToast('Error: No se permiten valores negativos');
+            this.render();
+            return;
+        }
+        const label = field === 'precio_un' ? 'PRECIO' : 'STOCK';
+        if (!confirm(`¿Actualizar ${label} del material ${codigo} a ${value}?`)) {
+            this.render();
+            return;
+        }
+        const obj = {}; obj[field] = numValue;
+        const { error } = await this.supabase.from('materiales').update(obj).eq('id', id);
+        if (!error) this.showToast('Sincronización exitosa');
+        else { this.showToast('Error de red'); this.render(); }
     }
 
     showToast(msg) {
@@ -288,10 +351,7 @@ class AppController {
         toastMsg.innerText = msg;
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0)';
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(24px)';
-        }, 2000);
+        setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(24px)'; }, 2800);
     }
 }
 
