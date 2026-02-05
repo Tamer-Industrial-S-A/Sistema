@@ -1,20 +1,28 @@
 
--- 1. Limpieza (Opcional)
-DROP TABLE IF EXISTS ord_trabajos;
-DROP TABLE IF EXISTS ord_fabricaciones;
-DROP TABLE IF EXISTS clientes;
-DROP TABLE IF EXISTS materiales;
+-- SCRIPT DE ACTUALIZACIÓN DE FORMATOS DE CÓDIGOS
+-- Ejecutar en el SQL Editor de Supabase
 
--- 2. Secuencias
-CREATE SEQUENCE IF NOT EXISTS seq_materiales_codigo START 1;
-CREATE SEQUENCE IF NOT EXISTS seq_clientes_codigo START 1;
-CREATE SEQUENCE IF NOT EXISTS seq_of_codigo START 1;
-CREATE SEQUENCE IF NOT EXISTS seq_ot_codigo START 1;
+-- 1. Eliminar tablas para recrear con secuencias específicas
+DROP TABLE IF EXISTS ord_trabajos CASCADE;
+DROP TABLE IF EXISTS ord_fabricaciones CASCADE;
+DROP TABLE IF EXISTS clientes CASCADE;
+DROP TABLE IF EXISTS materiales CASCADE;
 
--- 3. Tablas con Defaults Incrementales
+DROP SEQUENCE IF EXISTS seq_materiales_codigo;
+DROP SEQUENCE IF EXISTS seq_clientes_codigo;
+DROP SEQUENCE IF EXISTS seq_of_codigo;
+DROP SEQUENCE IF EXISTS seq_ot_codigo;
+
+-- 2. Crear Secuencias
+CREATE SEQUENCE seq_materiales_codigo START 1;
+CREATE SEQUENCE seq_clientes_codigo START 1;
+CREATE SEQUENCE seq_of_codigo START 1;
+CREATE SEQUENCE seq_ot_codigo START 1;
+
+-- 3. Crear Tablas con Defaults Formateados
 CREATE TABLE materiales (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  codigo TEXT DEFAULT ('MAT-' || nextval('seq_materiales_codigo')) UNIQUE,
+  codigo TEXT DEFAULT lpad(nextval('seq_materiales_codigo')::text, 12, '0') UNIQUE,
   descripcion TEXT NOT NULL,
   precio_un NUMERIC(12, 2) DEFAULT 0.00,
   en_stock INTEGER DEFAULT 0,
@@ -23,14 +31,14 @@ CREATE TABLE materiales (
 
 CREATE TABLE clientes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  cod_cliente TEXT DEFAULT ('CLI-' || nextval('seq_clientes_codigo')) UNIQUE,
+  cod_cliente TEXT DEFAULT ('C-' || lpad(nextval('seq_clientes_codigo')::text, 6, '0')) UNIQUE,
   razon_social TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE ord_fabricaciones (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  of TEXT DEFAULT ('OF-' || nextval('seq_of_codigo')) UNIQUE,
+  of TEXT DEFAULT ('OF-' || lpad(nextval('seq_of_codigo')::text, 6, '0')) UNIQUE,
   descripcion_of TEXT NOT NULL,
   cod_cliente TEXT REFERENCES clientes(cod_cliente) ON UPDATE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -38,19 +46,19 @@ CREATE TABLE ord_fabricaciones (
 
 CREATE TABLE ord_trabajos (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  ot TEXT DEFAULT ('OT-' || nextval('seq_ot_codigo')) UNIQUE,
+  ot TEXT DEFAULT ('OT-' || lpad(nextval('seq_ot_codigo')::text, 6, '0')) UNIQUE,
   descripcion_ot TEXT NOT NULL,
   ofabricaciones TEXT REFERENCES ord_fabricaciones(of) ON UPDATE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Seguridad
+-- 4. Habilitar RLS y Políticas Públicas
 ALTER TABLE materiales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ord_fabricaciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ord_trabajos ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "public_access" ON materiales FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "public_access" ON clientes FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "public_access" ON ord_fabricaciones FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "public_access" ON ord_trabajos FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total_materiales" ON materiales FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total_clientes" ON clientes FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total_of" ON ord_fabricaciones FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "acceso_total_ot" ON ord_trabajos FOR ALL TO anon USING (true) WITH CHECK (true);
