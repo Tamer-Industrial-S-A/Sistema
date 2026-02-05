@@ -346,3 +346,4 @@ class AppController {
 }
 
 window.app = new AppController();
+
