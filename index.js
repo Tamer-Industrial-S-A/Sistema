@@ -11,6 +11,7 @@ class AppController {
         this.data = { materiales: [], clientes: [], ofs: [], ots: [], cotizaciones: [] };
         this.filters = { materiales: '', clientes: '', ofs: '', ots: '' };
         this.editing = { table: null, id: null, item: null };
+        this.editingQuoteId = null; // ID de la cotización en edición
         
         this.draftQuote = {
             ot: '',
@@ -139,13 +140,18 @@ class AppController {
                 </section>
 
                 <!-- GENERADOR DE COTIZACIONES -->
-                <section class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex items-center gap-3 mb-8">
-                        <div class="p-3 bg-emerald-600 rounded-xl text-white shadow-md">📑</div>
-                        <div>
-                            <h3 class="text-xl font-black text-slate-800">Nueva Cotización</h3>
-                            <p class="text-[10px] text-emerald-600 uppercase tracking-widest font-black">Módulo de cálculo automático</p>
+                <section id="quote-generator" class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm ${this.editingQuoteId ? 'ring-4 ring-amber-400/20' : ''}">
+                    <div class="flex items-center justify-between mb-8">
+                        <div class="flex items-center gap-3">
+                            <div class="p-3 ${this.editingQuoteId ? 'bg-amber-500' : 'bg-emerald-600'} rounded-xl text-white shadow-md">📑</div>
+                            <div>
+                                <h3 class="text-xl font-black text-slate-800">${this.editingQuoteId ? 'Editando Cotización' : 'Nueva Cotización'}</h3>
+                                <p class="text-[10px] ${this.editingQuoteId ? 'text-amber-600' : 'text-emerald-600'} uppercase tracking-widest font-black">${this.editingQuoteId ? 'Modificando registro existente' : 'Módulo de cálculo automático'}</p>
+                            </div>
                         </div>
+                        ${this.editingQuoteId ? `
+                            <button onclick="app.clearDraftQuote()" class="bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-200 transition-all">Cancelar Edición</button>
+                        ` : ''}
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200">
@@ -220,9 +226,9 @@ class AppController {
                     </div>
 
                     <div class="flex justify-end gap-3 pt-6 border-t mt-8">
-                        <button onclick="app.clearDraftQuote()" class="px-6 py-3 text-slate-500 font-black hover:text-rose-600 transition-all text-xs uppercase tracking-widest">CANCELAR</button>
-                        <button onclick="app.saveQuote()" class="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-xl hover:bg-emerald-700 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]">
-                            Guardar Cotización
+                        <button onclick="app.clearDraftQuote()" class="px-6 py-3 text-slate-500 font-black hover:text-rose-600 transition-all text-xs uppercase tracking-widest">LIMPIAR</button>
+                        <button onclick="app.saveQuote()" class="px-12 py-4 ${this.editingQuoteId ? 'bg-amber-600' : 'bg-emerald-600'} text-white rounded-2xl font-black shadow-xl hover:opacity-90 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]">
+                            ${this.editingQuoteId ? '💾 Actualizar Cotización' : '💾 Guardar Cotización'}
                         </button>
                     </div>
                 </section>
@@ -235,7 +241,10 @@ class AppController {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${this.data.cotizaciones.map(q => `
                             <div class="p-6 border border-slate-200 bg-white rounded-3xl hover:border-blue-400 hover:shadow-2xl transition-all relative group">
-                                <button onclick="app.deleteQuote('${q.id}')" class="absolute top-4 right-4 p-2 text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">🗑️</button>
+                                <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick='app.loadQuoteForEdit(${JSON.stringify(q).replace(/'/g, "&apos;")})' class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Editar">✏️</button>
+                                    <button onclick="app.deleteQuote('${q.id}')" class="p-2 text-rose-400 hover:bg-rose-50 rounded-lg transition-all" title="Eliminar">🗑️</button>
+                                </div>
                                 <div class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-2">${q.codigo_cotizacion || 'SIN COD.'}</div>
                                 <div class="text-sm font-black text-slate-800 mb-6 uppercase">Referencia OT: ${q.ot_codigo}</div>
                                 <div class="flex justify-between items-end border-t border-slate-100 pt-5 mt-auto">
@@ -298,10 +307,28 @@ class AppController {
     }
 
     clearDraftQuote() {
-        if (confirm("¿Limpiar todos los datos de la cotización actual?")) {
+        if (confirm(this.editingQuoteId ? "¿Cancelar la edición actual?" : "¿Limpiar todos los datos de la cotización actual?")) {
             this.draftQuote = { ot: '', items: [] };
+            this.editingQuoteId = null;
             this.render();
         }
+    }
+
+    // Cargar cotización existente para editar
+    loadQuoteForEdit(quote) {
+        this.editingQuoteId = quote.id;
+        this.draftQuote = {
+            ot: quote.ot_codigo,
+            items: quote.items_json.map(item => ({
+                ...item,
+                precio_un: parseFloat(item.precio_un),
+                subtotal: parseFloat(item.subtotal)
+            }))
+        };
+        this.render();
+        const gen = document.getElementById('quote-generator');
+        if (gen) gen.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.showToast("COTIZACIÓN CARGADA PARA EDICIÓN");
     }
 
     async generateQuoteCode() {
@@ -338,24 +365,42 @@ class AppController {
 
         try {
             const total = this.draftQuote.items.reduce((acc, i) => acc + i.subtotal, 0);
-            const codigo = await this.generateQuoteCode();
+            
+            let res;
+            if (this.editingQuoteId) {
+                // Actualizar cotización existente
+                res = await this.supabase.from('cotizaciones').update({
+                    ot_codigo: this.draftQuote.ot,
+                    total_mats: total,
+                    items_json: this.draftQuote.items
+                }).eq('id', this.editingQuoteId);
+                
+                if (!res.error) {
+                    this.showToast(`COTIZACIÓN ACTUALIZADA`);
+                }
+            } else {
+                // Crear nueva cotización
+                const codigo = await this.generateQuoteCode();
+                const payload = {
+                    codigo_cotizacion: codigo,
+                    ot_codigo: this.draftQuote.ot,
+                    total_mats: total,
+                    items_json: this.draftQuote.items
+                };
+                res = await this.supabase.from('cotizaciones').insert([payload]);
+                
+                if (!res.error) {
+                    this.showToast(`COTIZACIÓN ${codigo} GUARDADA`);
+                }
+            }
 
-            const payload = {
-                codigo_cotizacion: codigo,
-                ot_codigo: this.draftQuote.ot,
-                total_mats: total,
-                items_json: this.draftQuote.items
-            };
-
-            const { error } = await this.supabase.from('cotizaciones').insert([payload]);
-
-            if (!error) {
-                this.showToast(`COTIZACIÓN ${codigo} GUARDADA`);
+            if (!res.error) {
                 this.draftQuote = { ot: '', items: [] };
+                this.editingQuoteId = null;
                 await this.refreshData();
             } else {
-                console.error("Supabase Error:", error);
-                alert("Error al procesar en servidor: " + error.message);
+                console.error("Supabase Error:", res.error);
+                alert("Error al procesar en servidor: " + res.error.message);
             }
         } catch (err) {
             console.error("Critical Error:", err);
@@ -368,6 +413,10 @@ class AppController {
         const { error } = await this.supabase.from('cotizaciones').delete().eq('id', id);
         if (!error) {
             this.showToast("COTIZACIÓN ELIMINADA");
+            if (this.editingQuoteId === id) {
+                this.editingQuoteId = null;
+                this.draftQuote = { ot: '', items: [] };
+            }
             await this.refreshData();
         }
     }
