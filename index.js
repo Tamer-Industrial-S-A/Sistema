@@ -79,7 +79,7 @@ class AppController {
             },
             'AUTOMATIZACION': () => {
                 mount.innerHTML = this.renderAutomationView();
-                this.attachMasterListeners(); // Para el registro de materiales dentro de automatización
+                this.attachMasterListeners();
             },
             'TECNICA': () => { mount.innerHTML = this.renderPlaceholder('TECNICA'); },
             'PLANEAMIENTO': () => { mount.innerHTML = this.renderPlaceholder('PLANEAMIENTO'); },
@@ -113,27 +113,27 @@ class AppController {
 
         return `
             <div class="space-y-12 animate-fadeIn pb-20">
-                <!-- REGISTRO DE MATERIALES (REQUERIMIENTO ESPECÍFICO) -->
+                <!-- REGISTRO DE MATERIALES -->
                 <section class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="w-2 h-6 bg-blue-500 rounded"></div>
-                        <h3 class="text-lg font-bold text-slate-800">ALTA DE NUEVOS MATERIALES</h3>
+                        <h3 class="text-lg font-bold text-slate-800 uppercase tracking-tight">Registro de Materiales</h3>
                     </div>
-                    <form id="form-material" class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                    <form id="form-material" class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
                         <div class="flex flex-col gap-1 md:col-span-2">
-                            <label class="text-[10px] font-bold text-slate-400">DESCRIPCIÓN</label>
-                            <input name="descripcion" required placeholder="Nombre del material" class="p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="text-[10px] font-black text-slate-500 uppercase">Descripción del Material</label>
+                            <input name="descripcion" required placeholder="Ej: Plancha Acero Inox 304 2mm" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium">
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-slate-400">PRECIO UN.</label>
-                            <input name="precio_un" required type="number" step="0.01" class="p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="text-[10px] font-black text-slate-500 uppercase">Precio Unitario ($)</label>
+                            <input name="precio_un" required type="number" step="0.01" placeholder="0.00" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium">
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-slate-400">EN STOCK</label>
-                            <input name="en_stock" required type="number" class="p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="text-[10px] font-black text-slate-500 uppercase">Stock Inicial</label>
+                            <input name="en_stock" required type="number" placeholder="0" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-medium">
                         </div>
                         <div class="md:col-span-4 mt-2">
-                            <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition-all uppercase text-xs tracking-widest shadow-lg">➕ Registrar Material</button>
+                            <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-xl font-black hover:bg-blue-700 transition-all uppercase text-xs tracking-widest shadow-md">Añadir al Inventario</button>
                         </div>
                     </form>
                 </section>
@@ -141,77 +141,77 @@ class AppController {
                 <!-- GENERADOR DE COTIZACIONES -->
                 <section class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="flex items-center gap-3 mb-8">
-                        <div class="p-3 bg-emerald-500 rounded-xl text-white shadow-lg">📑</div>
+                        <div class="p-3 bg-emerald-600 rounded-xl text-white shadow-md">📑</div>
                         <div>
-                            <h3 class="text-xl font-bold text-slate-800">Generar Cotización</h3>
-                            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Documentación de Costos</p>
+                            <h3 class="text-xl font-black text-slate-800">Nueva Cotización</h3>
+                            <p class="text-[10px] text-emerald-600 uppercase tracking-widest font-black">Módulo de cálculo automático</p>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200">
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-slate-400 tracking-tighter">ORDEN DE TRABAJO (OT)</label>
-                            <select onchange="app.updateQuoteOT(this.value)" class="p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
-                                <option value="">Seleccionar OT...</option>
+                            <label class="text-[10px] font-black text-slate-500">SELECCIONE ORDEN DE TRABAJO (OT)</label>
+                            <select onchange="app.updateQuoteOT(this.value)" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
+                                <option value="">--- Seleccionar ---</option>
                                 ${this.data.ots.map(o => `<option value="${o.ot}" ${this.draftQuote.ot === o.ot ? 'selected' : ''}>${o.ot} - ${o.descripcion_ot}</option>`).join('')}
                             </select>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-slate-400 tracking-tighter">OF ASOCIADA</label>
-                            <div class="p-2.5 bg-slate-200/50 border border-slate-200 rounded-lg text-slate-600 text-sm font-medium h-[42px] flex items-center">${relatedOF ? relatedOF.of + ' - ' + relatedOF.descripcion_of : '---'}</div>
+                            <label class="text-[10px] font-black text-slate-500">ORDEN DE FABRICACIÓN</label>
+                            <div class="p-2.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 text-sm font-bold h-[45px] flex items-center shadow-inner">${relatedOF ? relatedOF.of + ' - ' + relatedOF.descripcion_of : '---'}</div>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-slate-400 tracking-tighter">CLIENTE FINAL</label>
-                            <div class="p-2.5 bg-slate-200/50 border border-slate-200 rounded-lg text-slate-600 text-sm font-medium h-[42px] flex items-center">${relatedClient ? relatedClient.razon_social : '---'}</div>
+                            <label class="text-[10px] font-black text-slate-500">CLIENTE RESPONSABLE</label>
+                            <div class="p-2.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 text-sm font-bold h-[45px] flex items-center shadow-inner">${relatedClient ? relatedClient.razon_social : '---'}</div>
                         </div>
                     </div>
 
                     <div class="mb-6">
                         <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                            <h4 class="text-sm font-black text-slate-700 uppercase tracking-widest">Materiales de Cotización</h4>
+                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Desglose de Materiales</h4>
                             <div class="flex gap-2 w-full md:w-auto">
-                                <select id="material-picker" class="flex-1 md:w-80 p-2 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <option value="">Añadir Material al Listado...</option>
+                                <select id="material-picker" class="flex-1 md:w-96 p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium">
+                                    <option value="">Seleccionar material del catálogo...</option>
                                     ${this.data.materiales.map(m => `<option value="${m.id}">${m.codigo} - ${m.descripcion} ($${m.precio_un})</option>`).join('')}
                                 </select>
-                                <button onclick="app.addMaterialToQuote()" class="bg-blue-600 text-white px-5 rounded-lg font-bold text-xs hover:bg-blue-700 active:scale-95 transition-all">AÑADIR</button>
+                                <button onclick="app.addMaterialToQuote()" class="bg-slate-900 text-white px-6 rounded-lg font-black text-xs hover:bg-blue-600 transition-all shadow-md">AGREGAR</button>
                             </div>
                         </div>
 
-                        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-md">
                             <table class="w-full text-sm text-left">
-                                <thead class="bg-slate-50 text-slate-400 uppercase text-[9px] font-black tracking-widest border-b">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-black tracking-widest border-b border-slate-200">
                                     <tr>
                                         <th class="p-4">CÓDIGO</th>
                                         <th class="p-4">DESCRIPCIÓN</th>
-                                        <th class="p-4 text-right">UNITARIO</th>
-                                        <th class="p-4 text-center">CANT.</th>
+                                        <th class="p-4 text-right">PRECIO UNIT.</th>
+                                        <th class="p-4 text-center">CANTIDAD</th>
                                         <th class="p-4 text-right">SUBTOTAL</th>
                                         <th class="p-4 text-right"></th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    ${this.draftQuote.items.length === 0 ? `<tr><td colspan="6" class="p-10 text-center text-slate-400 italic">No hay materiales en esta cotización.</td></tr>` : ''}
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    ${this.draftQuote.items.length === 0 ? `<tr><td colspan="6" class="p-12 text-center text-slate-400 italic">La lista está vacía. Añada materiales desde el selector superior.</td></tr>` : ''}
                                     ${this.draftQuote.items.map((item, index) => `
-                                        <tr class="hover:bg-slate-50">
+                                        <tr class="hover:bg-slate-50/50">
                                             <td class="p-4 font-mono text-[11px] font-bold text-slate-700">${item.codigo}</td>
-                                            <td class="p-4 font-medium">${item.descripcion}</td>
-                                            <td class="p-4 text-right font-mono">$${item.precio_un.toFixed(2)}</td>
+                                            <td class="p-4 font-semibold text-slate-800">${item.descripcion}</td>
+                                            <td class="p-4 text-right font-mono text-slate-600">$${item.precio_un.toFixed(2)}</td>
                                             <td class="p-4 text-center">
                                                 <input type="number" min="1" value="${item.cantidad}" onchange="app.updateQuoteItemQty(${index}, this.value)" 
-                                                    class="w-16 p-1 text-center bg-white border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-400 outline-none font-bold">
+                                                    class="w-20 p-2 text-center bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none font-black shadow-sm">
                                             </td>
-                                            <td class="p-4 text-right font-bold text-blue-600 font-mono">$${item.subtotal.toFixed(2)}</td>
+                                            <td class="p-4 text-right font-black text-blue-600 font-mono">$${item.subtotal.toFixed(2)}</td>
                                             <td class="p-4 text-right">
-                                                <button onclick="app.removeMaterialFromQuote(${index})" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">🗑️</button>
+                                                <button onclick="app.removeMaterialFromQuote(${index})" class="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all">🗑️</button>
                                             </td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
                                 <tfoot class="bg-slate-900 text-white">
                                     <tr>
-                                        <td colspan="4" class="p-5 text-right uppercase tracking-widest text-[10px] font-black">Total Neto Materiales</td>
-                                        <td class="p-5 text-right text-xl font-mono font-bold">$${totalCotizacion.toFixed(2)}</td>
+                                        <td colspan="4" class="p-6 text-right uppercase tracking-widest text-[11px] font-black">Monto Total Estimado</td>
+                                        <td class="p-6 text-right text-2xl font-mono font-black">$${totalCotizacion.toFixed(2)}</td>
                                         <td></td>
                                     </tr>
                                 </tfoot>
@@ -220,33 +220,31 @@ class AppController {
                     </div>
 
                     <div class="flex justify-end gap-3 pt-6 border-t mt-8">
-                        <button onclick="app.clearDraftQuote()" class="px-6 py-2.5 text-slate-500 font-bold hover:text-rose-600 transition-all text-xs uppercase">LIMPIAR TODO</button>
-                        <button onclick="app.saveQuote()" class="px-10 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-xl hover:bg-emerald-700 active:scale-95 transition-all uppercase text-xs tracking-widest">
-                            💾 GUARDAR COTIZACIÓN
+                        <button onclick="app.clearDraftQuote()" class="px-6 py-3 text-slate-500 font-black hover:text-rose-600 transition-all text-xs uppercase tracking-widest">CANCELAR</button>
+                        <button onclick="app.saveQuote()" class="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-xl hover:bg-emerald-700 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]">
+                            Guardar Cotización
                         </button>
                     </div>
                 </section>
 
                 <!-- HISTORIAL -->
                 <section class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <span class="w-2 h-6 bg-slate-300 rounded"></span> Historial de Cotizaciones
-                        </h3>
-                    </div>
+                    <h3 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-3">
+                        <span class="w-2 h-6 bg-slate-300 rounded-full"></span> Cotizaciones Emitidas
+                    </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${this.data.cotizaciones.map(q => `
-                            <div class="p-5 border border-slate-200 bg-white rounded-2xl hover:border-blue-400 hover:shadow-xl transition-all cursor-default relative group">
-                                <button onclick="app.deleteQuote('${q.id}')" class="absolute top-4 right-4 p-2 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">🗑️</button>
-                                <div class="text-[10px] font-black text-blue-500 uppercase tracking-tighter mb-1">${q.codigo_cotizacion || 'S/N'}</div>
-                                <div class="text-sm font-bold text-slate-800 mb-4">OT: ${q.ot_codigo}</div>
-                                <div class="flex justify-between items-end border-t border-slate-100 pt-4">
-                                    <div class="text-[10px] text-slate-400 font-bold">${new Date(q.created_at).toLocaleDateString()}</div>
-                                    <div class="text-xl font-mono font-black text-slate-900">$${parseFloat(q.total_mats || 0).toFixed(2)}</div>
+                            <div class="p-6 border border-slate-200 bg-white rounded-3xl hover:border-blue-400 hover:shadow-2xl transition-all relative group">
+                                <button onclick="app.deleteQuote('${q.id}')" class="absolute top-4 right-4 p-2 text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">🗑️</button>
+                                <div class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-2">${q.codigo_cotizacion || 'SIN COD.'}</div>
+                                <div class="text-sm font-black text-slate-800 mb-6 uppercase">Referencia OT: ${q.ot_codigo}</div>
+                                <div class="flex justify-between items-end border-t border-slate-100 pt-5 mt-auto">
+                                    <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${new Date(q.created_at).toLocaleDateString()}</div>
+                                    <div class="text-2xl font-mono font-black text-slate-900">$${parseFloat(q.total_mats || 0).toFixed(2)}</div>
                                 </div>
                             </div>
                         `).join('')}
-                        ${this.data.cotizaciones.length === 0 ? '<div class="col-span-3 text-center py-10 text-slate-400 italic">No se han registrado cotizaciones.</div>' : ''}
+                        ${this.data.cotizaciones.length === 0 ? '<div class="col-span-3 text-center py-16 text-slate-400 italic">No hay registros previos en el sistema.</div>' : ''}
                     </div>
                 </section>
             </div>
@@ -300,7 +298,7 @@ class AppController {
     }
 
     clearDraftQuote() {
-        if (confirm("¿Limpiar cotización en curso?")) {
+        if (confirm("¿Limpiar todos los datos de la cotización actual?")) {
             this.draftQuote = { ot: '', items: [] };
             this.render();
         }
@@ -313,7 +311,6 @@ class AppController {
         const yyyy = now.getFullYear();
         const datePart = `${dd}-${mm}-${yyyy}`;
         
-        // Determinar secuencia incremental diaria
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const { count, error } = await this.supabase
             .from('cotizaciones')
@@ -331,11 +328,11 @@ class AppController {
 
     async saveQuote() {
         if (!this.draftQuote.ot) {
-            alert("Seleccione una Orden de Trabajo (OT).");
+            alert("Error: Debe seleccionar una Orden de Trabajo (OT) válida.");
             return;
         }
         if (this.draftQuote.items.length === 0) {
-            alert("Agregue al menos un material.");
+            alert("Error: La lista de materiales no puede estar vacía.");
             return;
         }
 
@@ -353,28 +350,24 @@ class AppController {
             const { error } = await this.supabase.from('cotizaciones').insert([payload]);
 
             if (!error) {
-                this.showToast(`Cotización ${codigo} registrada`);
+                this.showToast(`COTIZACIÓN ${codigo} GUARDADA`);
                 this.draftQuote = { ot: '', items: [] };
                 await this.refreshData();
             } else {
                 console.error("Supabase Error:", error);
-                if (error.code === '42703') {
-                    alert("ERROR DE ESQUEMA: La base de datos no tiene la columna 'codigo_cotizacion'. Por favor, ejecute el script SQL actualizado en Supabase.");
-                } else {
-                    alert("Error al guardar: " + error.message);
-                }
+                alert("Error al procesar en servidor: " + error.message);
             }
         } catch (err) {
-            console.error("Critical Save Error:", err);
-            alert("Error crítico del sistema al guardar.");
+            console.error("Critical Error:", err);
+            alert("Error crítico interno.");
         }
     }
 
     async deleteQuote(id) {
-        if (!confirm("¿Eliminar cotización?")) return;
+        if (!confirm("¿Eliminar permanentemente esta cotización del historial?")) return;
         const { error } = await this.supabase.from('cotizaciones').delete().eq('id', id);
         if (!error) {
-            this.showToast("Eliminado correctamente");
+            this.showToast("COTIZACIÓN ELIMINADA");
             await this.refreshData();
         }
     }
@@ -386,70 +379,70 @@ class AppController {
 
         return `
             <div class="space-y-12 animate-fadeIn pb-20">
-                ${this.renderSection('materiales', 'GESTIÓN DE MATERIALES', 'blue', 'form-material', `
+                ${this.renderSection('materiales', 'Gestión de Materiales', 'blue', 'form-material', `
                     <div class="flex flex-col gap-1 md:col-span-2">
-                        <label class="text-[10px] font-bold text-slate-400">DESCRIPCIÓN</label>
-                        <input name="descripcion" required value="${this.getVal('materiales', 'descripcion')}" class="p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Descripción</label>
+                        <input name="descripcion" required value="${this.getVal('materiales', 'descripcion')}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium">
                     </div>
                     <div class="flex flex-col gap-1">
-                        <label class="text-[10px] font-bold text-slate-400">PRECIO UNITARIO</label>
-                        <input name="precio_un" required type="number" step="0.01" value="${this.getVal('materiales', 'precio_un') || 0}" class="p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Precio Unit.</label>
+                        <input name="precio_un" required type="number" step="0.01" value="${this.getVal('materiales', 'precio_un') || 0}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium">
                     </div>
                     <div class="flex flex-col gap-1">
-                        <label class="text-[10px] font-bold text-slate-400">STOCK</label>
-                        <input name="en_stock" required type="number" value="${this.getVal('materiales', 'en_stock') || 0}" class="p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">En Stock</label>
+                        <input name="en_stock" required type="number" value="${this.getVal('materiales', 'en_stock') || 0}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium">
                     </div>
                 `, ['CÓDIGO', 'DESCRIPCIÓN', 'VALOR', 'STOCK'], filter(this.data.materiales, this.filters.materiales, ['codigo', 'descripcion']), (m) => `
                     <td class="p-3 font-mono text-[11px] font-bold text-slate-700">${m.codigo}</td>
-                    <td class="p-3 font-medium">${m.descripcion}</td>
-                    <td class="p-3 font-mono text-blue-600">$${m.precio_un}</td>
-                    <td class="p-3">${m.en_stock}</td>
+                    <td class="p-3 font-semibold text-slate-800">${m.descripcion}</td>
+                    <td class="p-3 font-mono text-blue-600 font-black">$${m.precio_un}</td>
+                    <td class="p-3 font-bold">${m.en_stock}</td>
                 `)}
 
-                ${this.renderSection('clientes', 'DIRECTORIO DE CLIENTES', 'emerald', 'form-cliente', `
+                ${this.renderSection('clientes', 'Directorio de Clientes', 'emerald', 'form-cliente', `
                     <div class="flex flex-col gap-1 md:col-span-4">
-                        <label class="text-[10px] font-bold text-slate-400">RAZÓN SOCIAL / NOMBRE</label>
-                        <input name="razon_social" required value="${this.getVal('clientes', 'razon_social')}" class="p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Razón Social o Nombre Completo</label>
+                        <input name="razon_social" required value="${this.getVal('clientes', 'razon_social')}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none font-medium">
                     </div>
-                `, ['COD. CLIENTE', 'RAZÓN SOCIAL'], filter(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']), (c) => `
-                    <td class="p-3 font-bold text-slate-700">${c.cod_cliente}</td>
-                    <td class="p-3 font-medium">${c.razon_social}</td>
+                `, ['CÓDIGO', 'RAZÓN SOCIAL'], filter(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']), (c) => `
+                    <td class="p-3 font-black text-slate-700">${c.cod_cliente}</td>
+                    <td class="p-3 font-bold text-slate-800">${c.razon_social}</td>
                 `)}
 
-                ${this.renderSection('ord_fabricaciones', 'ORDENES DE FABRICACIÓN', 'amber', 'form-of', `
+                ${this.renderSection('ord_fabricaciones', 'Órdenes de Fabricación', 'amber', 'form-of', `
                     <div class="flex flex-col gap-1 md:col-span-2">
-                        <label class="text-[10px] font-bold text-slate-400">DESCRIPCIÓN DE LA OF</label>
-                        <input name="descripcion_of" required value="${this.getVal('ord_fabricaciones', 'descripcion_of')}" class="p-2 border border-slate-300 rounded outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Detalle del Proyecto</label>
+                        <input name="descripcion_of" required value="${this.getVal('ord_fabricaciones', 'descripcion_of')}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-medium">
                     </div>
                     <div class="flex flex-col gap-1 md:col-span-2">
-                        <label class="text-[10px] font-bold text-slate-400">CLIENTE ASOCIADO</label>
-                        <select name="cod_cliente" required class="p-2 bg-white border border-slate-300 rounded outline-none">
-                            <option value="">Seleccionar Cliente...</option>
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Cliente Asociado</label>
+                        <select name="cod_cliente" required class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-bold">
+                            <option value="">--- Seleccionar ---</option>
                             ${this.data.clientes.map(c => `<option value="${c.cod_cliente}" ${this.getVal('ord_fabricaciones', 'cod_cliente') === c.cod_cliente ? 'selected' : ''}>${c.cod_cliente} - ${c.razon_social}</option>`).join('')}
                         </select>
                     </div>
-                `, ['Nº OF', 'DESCRIPCIÓN PROYECTO', 'CLIENTE'], filter(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of']), (o) => `
-                    <td class="p-3 font-bold text-slate-700">${o.of}</td>
-                    <td class="p-3">${o.descripcion_of}</td>
-                    <td class="p-3 text-blue-600 font-bold">${o.cod_cliente}</td>
+                `, ['Nº OF', 'PROYECTO', 'CÓD. CLIENTE'], filter(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of']), (o) => `
+                    <td class="p-3 font-black text-slate-700">${o.of}</td>
+                    <td class="p-3 font-semibold text-slate-800">${o.descripcion_of}</td>
+                    <td class="p-3 text-blue-600 font-black">${o.cod_cliente}</td>
                 `)}
 
-                ${this.renderSection('ord_trabajos', 'ORDENES DE TRABAJO', 'indigo', 'form-ot', `
+                ${this.renderSection('ord_trabajos', 'Órdenes de Trabajo', 'indigo', 'form-ot', `
                     <div class="flex flex-col gap-1 md:col-span-2">
-                        <label class="text-[10px] font-bold text-slate-400">TAREA A REALIZAR</label>
-                        <input name="descripcion_ot" required value="${this.getVal('ord_trabajos', 'descripcion_ot')}" class="p-2 border border-slate-300 rounded outline-none">
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Descripción de la Tarea</label>
+                        <input name="descripcion_ot" required value="${this.getVal('ord_trabajos', 'descripcion_ot')}" class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
                     </div>
                     <div class="flex flex-col gap-1 md:col-span-2">
-                        <label class="text-[10px] font-bold text-slate-400">ORDEN DE FABRICACIÓN VINCULADA</label>
-                        <select name="ofabricaciones" required class="p-2 bg-white border border-slate-300 rounded outline-none">
-                            <option value="">Seleccionar OF...</option>
+                        <label class="text-[10px] font-black text-slate-500 uppercase">Vincular a OF</label>
+                        <select name="ofabricaciones" required class="p-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+                            <option value="">--- Seleccionar ---</option>
                             ${this.data.ofs.map(f => `<option value="${f.of}" ${this.getVal('ord_trabajos', 'ofabricaciones') === f.of ? 'selected' : ''}>${f.of} - ${f.descripcion_of}</option>`).join('')}
                         </select>
                     </div>
                 `, ['Nº OT', 'DETALLE TAREA', 'Nº OF'], filter(this.data.ots, this.filters.ots, ['ot', 'descripcion_ot']), (t) => `
-                    <td class="p-3 font-bold text-slate-700">${t.ot}</td>
-                    <td class="p-3">${t.descripcion_ot}</td>
-                    <td class="p-3 font-mono text-indigo-600 font-bold">${t.ofabricaciones}</td>
+                    <td class="p-3 font-black text-slate-700">${t.ot}</td>
+                    <td class="p-3 font-semibold text-slate-800">${t.descripcion_ot}</td>
+                    <td class="p-3 font-mono text-indigo-600 font-black">${t.ofabricaciones}</td>
                 `)}
             </div>
         `;
@@ -462,39 +455,39 @@ class AppController {
         return `
             <section class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm animate-fadeIn">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b pb-6">
-                    <h3 class="text-xl font-black text-slate-800 flex items-center gap-3">
-                        <span class="w-2 h-8 bg-${color}-500 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.1)]"></span> ${title}
+                    <h3 class="text-xl font-black text-slate-800 flex items-center gap-3 uppercase tracking-tighter">
+                        <span class="w-2 h-8 bg-${color}-500 rounded-full"></span> ${title}
                     </h3>
                     <div class="relative w-full md:w-80">
-                        <input type="text" placeholder="Filtro rápido..." oninput="app.setFilter('${key}', this.value)" value="${this.filters[key] || ''}" class="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                        <span class="absolute right-4 top-3 text-slate-400">🔍</span>
+                        <input type="text" placeholder="Buscador inteligente..." oninput="app.setFilter('${key}', this.value)" value="${this.filters[key] || ''}" class="w-full pl-4 pr-10 py-3 bg-white text-slate-900 border border-slate-300 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium placeholder:text-slate-400">
+                        <span class="absolute right-4 top-3.5 text-slate-400">🔍</span>
                     </div>
                 </div>
-                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10 bg-slate-50 p-8 rounded-2xl border border-slate-100 shadow-inner">
+                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10 bg-slate-50 p-8 rounded-3xl border border-slate-200 shadow-inner">
                     ${formFields}
                     <div class="md:col-span-4 flex gap-3 mt-4">
-                        <button type="submit" class="flex-1 bg-${isEditing ? 'amber' : 'blue'}-600 text-white p-3.5 rounded-xl font-black shadow-lg hover:opacity-90 active:scale-[0.99] transition-all uppercase tracking-widest text-xs">
-                            ${isEditing ? '💾 ACTUALIZAR REGISTRO' : '➕ REGISTRAR NUEVO'}
+                        <button type="submit" class="flex-1 bg-${isEditing ? 'amber' : 'blue'}-600 text-white p-4 rounded-2xl font-black shadow-lg hover:opacity-95 active:scale-[0.98] transition-all uppercase tracking-widest text-xs">
+                            ${isEditing ? 'Guardar Cambios' : 'Registrar Nuevo'}
                         </button>
-                        ${isEditing ? `<button type="button" onclick="app.cancelEdit()" class="px-10 bg-white border border-slate-300 text-slate-500 rounded-xl font-bold hover:bg-slate-100 uppercase text-xs">CANCELAR</button>` : ''}
+                        ${isEditing ? `<button type="button" onclick="app.cancelEdit()" class="px-12 bg-white text-slate-600 border border-slate-300 rounded-2xl font-black hover:bg-slate-100 uppercase text-xs tracking-widest">CANCELAR</button>` : ''}
                     </div>
                 </form>
-                <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                <div class="border border-slate-200 rounded-3xl overflow-hidden shadow-md bg-white">
                     <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b">
+                        <thead class="bg-slate-50 text-slate-400 uppercase text-[9px] font-black tracking-widest border-b border-slate-200">
                             <tr>
                                 ${headers.map(h => `<th class="p-5">${h}</th>`).join('')}
-                                <th class="p-5 text-right">GESTIÓN</th>
+                                <th class="p-5 text-right">ACCIONES</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            ${list.length === 0 ? `<tr><td colspan="${totalCols}" class="p-16 text-center text-slate-300 italic font-medium">Bandeja de datos vacía.</td></tr>` : ''}
+                            ${list.length === 0 ? `<tr><td colspan="${totalCols}" class="p-16 text-center text-slate-300 font-bold uppercase tracking-widest">Base de datos sin registros</td></tr>` : ''}
                             ${list.map(item => `
-                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                <tr class="hover:bg-slate-50/50 transition-all">
                                     ${rowTemplate(item)}
                                     <td class="p-5 text-right space-x-1">
-                                        <button onclick='app.startEdit("${key}", ${JSON.stringify(item).replace(/'/g, "&apos;")})' class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Modificar">✏️</button>
-                                        <button onclick="app.deleteRecord('${key}', '${item.id}')" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Borrar">🗑️</button>
+                                        <button onclick='app.startEdit("${key}", ${JSON.stringify(item).replace(/'/g, "&apos;")})' class="p-3 text-blue-500 hover:bg-blue-50 rounded-2xl transition-all">✏️</button>
+                                        <button onclick="app.deleteRecord('${key}', '${item.id}')" class="p-3 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all">🗑️</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -508,42 +501,38 @@ class AppController {
     renderPurchasesView(materials) {
         return `
             <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-fadeIn">
-                <div class="p-8 bg-slate-50 border-b flex justify-between items-center">
+                <div class="p-8 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                     <div>
-                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Control de Inventario</h3>
-                        <p class="text-sm text-slate-500 font-medium">Actualización masiva de precios y existencias.</p>
-                    </div>
-                    <div class="bg-white p-3 rounded-2xl border shadow-sm">
-                        <span class="text-xs font-black text-blue-600 block uppercase tracking-widest">Items Registrados</span>
-                        <span class="text-2xl font-black text-slate-800">${materials.length}</span>
+                        <h3 class="text-2xl font-black text-slate-900 uppercase tracking-tighter">Inventario y Precios</h3>
+                        <p class="text-sm text-slate-500 font-bold uppercase tracking-widest text-[10px]">Actualización manual de stock</p>
                     </div>
                 </div>
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b">
+                    <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
                         <tr>
-                            <th class="p-6">CÓDIGO MATERIAL</th>
-                            <th class="p-6">DESCRIPCIÓN DEL ARTÍCULO</th>
-                            <th class="p-6 text-right">VALOR UNITARIO ($)</th>
-                            <th class="p-6 text-right">STOCK DISP.</th>
-                            <th class="p-6 text-right">CONFIRMACIÓN</th>
+                            <th class="p-6">CÓDIGO</th>
+                            <th class="p-6">DETALLE DEL MATERIAL</th>
+                            <th class="p-6 text-right">VALOR UNIT. ($)</th>
+                            <th class="p-6 text-right">STOCK</th>
+                            <th class="p-6 text-right">ACCIÓN</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-slate-100 bg-white">
                         ${materials.map(m => `
-                            <tr class="hover:bg-blue-50/20 transition-all group">
-                                <td class="p-6 font-mono text-[11px] font-black text-slate-700">${m.codigo}</td>
-                                <td class="p-6 text-slate-600 text-sm font-medium">${m.descripcion}</td>
+                            <tr class="hover:bg-blue-50/10 transition-all">
+                                <td class="p-6 font-mono text-[11px] font-black text-slate-500">${m.codigo}</td>
+                                <td class="p-6 text-slate-900 text-sm font-bold">${m.descripcion}</td>
                                 <td class="p-6 text-right">
                                     <input type="number" id="price-${m.id}" step="0.01" value="${m.precio_un}" 
-                                        class="w-32 p-2.5 bg-white border-2 border-slate-100 rounded-xl text-right font-mono font-bold focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
+                                        class="w-32 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-mono font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
                                 </td>
                                 <td class="p-6 text-right">
                                     <input type="number" id="stock-${m.id}" value="${m.en_stock}" 
-                                        class="w-24 p-2.5 bg-white border-2 border-slate-100 rounded-xl text-right font-bold focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
+                                        class="w-24 p-3 bg-white text-slate-900 border-2 border-slate-200 rounded-2xl text-right font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
                                 </td>
                                 <td class="p-6 text-right">
                                     <button onclick="app.savePurchaseRow('${m.id}', '${m.codigo}')" 
-                                        class="px-5 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black shadow-lg hover:bg-emerald-600 active:scale-95 transition-all uppercase tracking-widest">
+                                        class="px-6 py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black shadow-lg hover:bg-emerald-600 transition-all uppercase tracking-widest">
                                         ACTUALIZAR
                                     </button>
                                 </td>
@@ -564,11 +553,11 @@ class AppController {
         const stock = parseInt(stockInput.value);
 
         if (isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
-            this.showToast("Datos incorrectos");
+            this.showToast("VALORES NO VÁLIDOS");
             return;
         }
 
-        if (!confirm(`¿Actualizar Material ${codigo}?\nPrecio: $${price}\nStock: ${stock}`)) return;
+        if (!confirm(`CONFIRMAR CAMBIOS:\nMaterial: ${codigo}\nNuevo Precio: $${price}\nNuevo Stock: ${stock}`)) return;
 
         const { error } = await this.supabase.from('materiales').update({
             precio_un: price,
@@ -576,7 +565,7 @@ class AppController {
         }).eq('id', id);
 
         if (!error) {
-            this.showToast(`Material ${codigo} actualizado`);
+            this.showToast(`ACTUALIZADO: ${codigo}`);
             const mat = this.data.materiales.find(m => m.id === id);
             if (mat) { mat.precio_un = price; mat.en_stock = stock; }
         } else {
@@ -616,14 +605,14 @@ class AppController {
     }
 
     async deleteRecord(table, id) {
-        if (!confirm("Esta acción no se puede deshacer. ¿Continuar?")) return;
+        if (!confirm("ADVERTENCIA: ¿Eliminar este registro de forma permanente?")) return;
         const { error } = await this.supabase.from(table).delete().eq('id', id);
         if (!error) {
-            this.showToast("Registro eliminado");
+            this.showToast("REGISTRO ELIMINADO");
             this.editing = { table: null, id: null, item: null };
             await this.refreshData();
         } else {
-            alert("Restricción de integridad: El registro está vinculado en otra tabla.");
+            alert("Error: El registro tiene dependencias activas.");
         }
     }
 
@@ -651,7 +640,7 @@ class AppController {
                 }
 
                 if (!res.error) {
-                    this.showToast("Base de datos actualizada");
+                    this.showToast("DATOS SINCRONIZADOS");
                     this.editing = { table: null, id: null, item: null };
                     await this.refreshData();
                 } else {
