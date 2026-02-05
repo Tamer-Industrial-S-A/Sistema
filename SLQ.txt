@@ -1,0 +1,41 @@
+-- 1. Tabla de MATERIALES
+CREATE TABLE materiales (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  codigo TEXT NOT NULL UNIQUE,
+  descripcion TEXT,
+  precio_un NUMERIC(12, 2) DEFAULT 0.00,
+  en_stock INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Tabla de CLIENTES
+CREATE TABLE clientes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  cod_cliente TEXT NOT NULL UNIQUE, -- Usado para la relación
+  razon_social TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Tabla de ORDENES DE FABRICACIÓN (OF)
+CREATE TABLE ord_fabricaciones (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  of TEXT NOT NULL UNIQUE, -- Usado para la relación con OT
+  descripcion_of TEXT,
+  cod_cliente TEXT REFERENCES clientes(cod_cliente) ON UPDATE CASCADE ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Tabla de ORDENES DE TRABAJO (OT)
+CREATE TABLE ord_trabajos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  ot TEXT NOT NULL UNIQUE,
+  descripcion_ot TEXT,
+  ofabricaciones TEXT REFERENCES ord_fabricaciones(of) ON UPDATE CASCADE ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Índices para mejorar la velocidad de búsqueda
+CREATE INDEX idx_materiales_codigo ON materiales(codigo);
+CREATE INDEX idx_clientes_codigo ON clientes(cod_cliente);
+CREATE INDEX idx_of_numero ON ord_fabricaciones(of);
+CREATE INDEX idx_ot_numero ON ord_trabajos(ot);

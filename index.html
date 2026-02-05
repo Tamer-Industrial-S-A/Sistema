@@ -1,0 +1,89 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAMER INDUSTRIAL S.A. - ERP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-item.active { background-color: #1e293b; color: white; border-left: 4px solid #3b82f6; }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-100 text-slate-900 overflow-hidden h-screen flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-20">
+        <div class="p-6 border-b border-slate-800">
+            <h1 class="text-xl font-bold text-white flex flex-col">
+                <span>TAMER</span>
+                <span class="text-xs text-blue-400 tracking-widest font-light uppercase">Industrial S.A.</span>
+            </h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <button onclick="app.setView('BASE_DE_DATOS')" id="btn-BASE_DE_DATOS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Base de Datos</span>
+            </button>
+            <button onclick="app.setView('AUTOMATIZACION')" id="btn-AUTOMATIZACION" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Automatización (Materiales)</span>
+            </button>
+            <button onclick="app.setView('COMPRAS')" id="btn-COMPRAS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Compras (Stock/Precios)</span>
+            </button>
+            <div class="h-px bg-slate-800 my-4"></div>
+            <button onclick="app.setView('PLANEAMIENTO')" id="btn-PLANEAMIENTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Planeamiento (OF)</span>
+            </button>
+            <button onclick="app.setView('PROYECTO')" id="btn-PROYECTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Proyecto (OT)</span>
+            </button>
+            <div class="h-px bg-slate-800 my-4"></div>
+            <button onclick="app.setView('TECNICA')" id="btn-TECNICA" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Técnica</span>
+            </button>
+            <button onclick="app.setView('CORTE_CON_AGUA')" id="btn-CORTE_CON_AGUA" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Corte con Agua</span>
+            </button>
+            <button onclick="app.setView('TALLER')" id="btn-TALLER" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Taller</span>
+            </button>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="h-16 bg-white border-b px-8 flex items-center justify-between">
+            <h2 id="view-title" class="text-xl font-bold text-slate-800 uppercase tracking-tight">Dashboard</h2>
+            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-[10px] font-bold">
+                <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span id="status-text" class="uppercase">Verificando...</span>
+            </div>
+        </header>
+
+        <div id="content-mount" class="flex-1 overflow-y-auto p-8">
+            <!-- Contenido dinámico aquí -->
+        </div>
+
+        <div id="toast" class="fixed bottom-8 right-8 opacity-0 transition-all duration-300 pointer-events-none">
+            <div class="bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl text-sm font-bold border-l-4 border-blue-500">
+                <span id="toast-msg"></span>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="index.js"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
