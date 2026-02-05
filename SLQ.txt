@@ -1,41 +1,56 @@
--- 1. Tabla de MATERIALES
+
+-- 1. Limpieza (Opcional)
+DROP TABLE IF EXISTS ord_trabajos;
+DROP TABLE IF EXISTS ord_fabricaciones;
+DROP TABLE IF EXISTS clientes;
+DROP TABLE IF EXISTS materiales;
+
+-- 2. Secuencias
+CREATE SEQUENCE IF NOT EXISTS seq_materiales_codigo START 1;
+CREATE SEQUENCE IF NOT EXISTS seq_clientes_codigo START 1;
+CREATE SEQUENCE IF NOT EXISTS seq_of_codigo START 1;
+CREATE SEQUENCE IF NOT EXISTS seq_ot_codigo START 1;
+
+-- 3. Tablas con Defaults Incrementales
 CREATE TABLE materiales (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  codigo TEXT NOT NULL UNIQUE,
-  descripcion TEXT,
+  codigo TEXT DEFAULT ('MAT-' || nextval('seq_materiales_codigo')) UNIQUE,
+  descripcion TEXT NOT NULL,
   precio_un NUMERIC(12, 2) DEFAULT 0.00,
   en_stock INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Tabla de CLIENTES
 CREATE TABLE clientes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  cod_cliente TEXT NOT NULL UNIQUE, -- Usado para la relación
+  cod_cliente TEXT DEFAULT ('CLI-' || nextval('seq_clientes_codigo')) UNIQUE,
   razon_social TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Tabla de ORDENES DE FABRICACIÓN (OF)
 CREATE TABLE ord_fabricaciones (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  of TEXT NOT NULL UNIQUE, -- Usado para la relación con OT
-  descripcion_of TEXT,
-  cod_cliente TEXT REFERENCES clientes(cod_cliente) ON UPDATE CASCADE ON DELETE SET NULL,
+  of TEXT DEFAULT ('OF-' || nextval('seq_of_codigo')) UNIQUE,
+  descripcion_of TEXT NOT NULL,
+  cod_cliente TEXT REFERENCES clientes(cod_cliente) ON UPDATE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Tabla de ORDENES DE TRABAJO (OT)
 CREATE TABLE ord_trabajos (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  ot TEXT NOT NULL UNIQUE,
-  descripcion_ot TEXT,
-  ofabricaciones TEXT REFERENCES ord_fabricaciones(of) ON UPDATE CASCADE ON DELETE SET NULL,
+  ot TEXT DEFAULT ('OT-' || nextval('seq_ot_codigo')) UNIQUE,
+  descripcion_ot TEXT NOT NULL,
+  ofabricaciones TEXT REFERENCES ord_fabricaciones(of) ON UPDATE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Índices para mejorar la velocidad de búsqueda
-CREATE INDEX idx_materiales_codigo ON materiales(codigo);
-CREATE INDEX idx_clientes_codigo ON clientes(cod_cliente);
-CREATE INDEX idx_of_numero ON ord_fabricaciones(of);
-CREATE INDEX idx_ot_numero ON ord_trabajos(ot);
+-- 4. Seguridad
+ALTER TABLE materiales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ord_fabricaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ord_trabajos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "public_access" ON materiales FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "public_access" ON clientes FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "public_access" ON ord_fabricaciones FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "public_access" ON ord_trabajos FOR ALL TO anon USING (true) WITH CHECK (true);
