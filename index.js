@@ -16,7 +16,8 @@ class AppController {
 
     async init() {
         this.updateStatus('online');
-        this.setView(this.currentView);
+        // Primera carga de datos
+        await this.refreshData();
     }
 
     updateStatus(status) {
@@ -27,6 +28,7 @@ class AppController {
         text.innerText = status === 'online' ? 'Sincronizado' : 'Error';
     }
 
+    // Nueva función para cambiar de vista sin recargar datos necesariamente
     setView(viewName) {
         this.currentView = viewName;
         document.getElementById('view-title').innerText = viewName.replace(/_/g, ' ');
@@ -37,34 +39,37 @@ class AppController {
         this.render();
     }
 
-    async fetchAll() {
-        const fetch = async (table) => {
-            const { data } = await this.supabase.from(table).select('*').order('created_at', { ascending: false });
+    // Solo se llama cuando realmente necesitamos datos nuevos de la DB
+    async refreshData() {
+        const fetchTable = async (table) => {
+            const { data, error } = await this.supabase.from(table).select('*').order('created_at', { ascending: false });
+            if (error) console.error(`Error fetching ${table}:`, error);
             return data || [];
         };
-        this.data.materiales = await fetch('materiales');
-        this.data.clientes = await fetch('clientes');
-        this.data.ofs = await fetch('ord_fabricaciones');
-        this.data.ots = await fetch('ord_trabajos');
+
+        this.data.materiales = await fetchTable('materiales');
+        this.data.clientes = await fetchTable('clientes');
+        this.data.ofs = await fetchTable('ord_fabricaciones');
+        this.data.ots = await fetchTable('ord_trabajos');
+        
+        this.render();
     }
 
-    async render() {
+    // Función de renderizado SIN await para que sea instantánea
+    render() {
         const mount = document.getElementById('content-mount');
         if (!mount) return;
 
         if (this.currentView === 'BASE_DE_DATOS') {
-            await this.fetchAll();
             mount.innerHTML = this.renderMasterDatabase();
             this.attachMasterListeners();
         } else if (this.currentView === 'COMPRAS') {
-            this.data.materiales = await this.fetchTable('materiales');
             mount.innerHTML = this.renderPurchasesView(this.data.materiales);
         } else {
-            mount.innerHTML = `<div class="p-20 text-center text-slate-400 italic">Módulo en desarrollo.</div>`;
+            mount.innerHTML = `<div class="p-20 text-center text-slate-400 animate-fadeIn italic">El módulo ${this.currentView} está bajo desarrollo técnico.</div>`;
         }
     }
 
-    // Facilita obtener el valor actual si estamos editando
     getVal(table, field) {
         if (this.editing.table === table && this.editing.item) {
             return this.editing.item[field] || '';
@@ -81,11 +86,11 @@ class AppController {
                 ${this.renderSection('materiales', 'MATERIALES', 'blue', 'form-material', `
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-bold text-slate-400">CÓDIGO (Auto si vacío)</label>
-                        <input name="codigo" value="${this.getVal('materiales', 'codigo')}" placeholder="Automático" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                        <input name="codigo" value="${this.getVal('materiales', 'codigo')}" placeholder="MAT-..." class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-bold text-slate-400">DESCRIPCIÓN</label>
-                        <input name="descripcion" required value="${this.getVal('materiales', 'descripcion')}" placeholder="Nombre del material" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
+                        <input name="descripcion" required value="${this.getVal('materiales', 'descripcion')}" placeholder="Descripción material" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-bold text-slate-400">PRECIO UN.</label>
@@ -96,45 +101,63 @@ class AppController {
                         <input name="en_stock" required type="number" min="0" value="${this.getVal('materiales', 'en_stock') || 0}" class="p-2 bg-white text-slate-900 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 `, filter(this.data.materiales, this.filters.materiales, ['codigo', 'descripcion']), (m) => `
-                    <td class="p-3 font-bold">${m.codigo}</td><td class="p-3">${m.descripcion}</td><td class="p-3">$${m.precio_un}</td><td class="p-3">${m.en_stock}</td>
+                    <td class="p-3 font-bold text-slate-700">${m.codigo}</td><td class="p-3">${m.descripcion}</td><td class="p-3 font-mono text-blue-600">$${m.precio_un}</td><td class="p-3">${m.en_stock}</td>
                 `)}
 
                 <!-- CLIENTES -->
                 ${this.renderSection('clientes', 'CLIENTES', 'emerald', 'form-cliente', `
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-bold text-slate-400">CÓDIGO CLIENTE</label>
-                        <input name="cod_cliente" value="${this.getVal('clientes', 'cod_cliente')}" placeholder="Automático" class="p-2 bg-white border rounded">
+                        <input name="cod_cliente" value="${this.getVal('clientes', 'cod_cliente')}" placeholder="CLI-..." class="p-2 bg-white border border-slate-300 rounded">
                     </div>
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-bold text-slate-400">RAZÓN SOCIAL</label>
-                        <input name="razon_social" required value="${this.getVal('clientes', 'razon_social')}" placeholder="Nombre empresa" class="p-2 bg-white border rounded">
+                        <input name="razon_social" required value="${this.getVal('clientes', 'razon_social')}" placeholder="Nombre de empresa" class="p-2 bg-white border border-slate-300 rounded">
                     </div>
                 `, filter(this.data.clientes, this.filters.clientes, ['cod_cliente', 'razon_social']), (c) => `
-                    <td class="p-3 font-bold">${c.cod_cliente}</td><td class="p-3">${c.razon_social}</td>
+                    <td class="p-3 font-bold text-slate-700">${c.cod_cliente}</td><td class="p-3">${c.razon_social}</td><td class="p-3 italic text-slate-400">-</td><td class="p-3 italic text-slate-400">-</td>
                 `)}
 
                 <!-- OF -->
                 ${this.renderSection('ord_fabricaciones', 'ORDENES DE FABRICACIÓN (OF)', 'amber', 'form-of', `
-                    <input name="of" value="${this.getVal('ord_fabricaciones', 'of')}" placeholder="NÚMERO OF (Auto)" class="p-2 bg-white border rounded">
-                    <input name="descripcion_of" required value="${this.getVal('ord_fabricaciones', 'descripcion_of')}" placeholder="DESCRIPCIÓN" class="p-2 bg-white border rounded">
-                    <select name="cod_cliente" required class="p-2 bg-white border rounded">
-                        <option value="">Seleccionar Cliente...</option>
-                        ${this.data.clientes.map(c => `<option value="${c.cod_cliente}" ${this.getVal('ord_fabricaciones', 'cod_cliente') === c.cod_cliente ? 'selected' : ''}>${c.razon_social}</option>`).join('')}
-                    </select>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-slate-400">Nº OF</label>
+                        <input name="of" value="${this.getVal('ord_fabricaciones', 'of')}" placeholder="OF-..." class="p-2 bg-white border border-slate-300 rounded">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-slate-400">DESCRIPCIÓN</label>
+                        <input name="descripcion_of" required value="${this.getVal('ord_fabricaciones', 'descripcion_of')}" placeholder="Proyecto / Detalle" class="p-2 bg-white border border-slate-300 rounded">
+                    </div>
+                    <div class="flex flex-col gap-1 md:col-span-2">
+                        <label class="text-[10px] font-bold text-slate-400">CLIENTE VINCULADO</label>
+                        <select name="cod_cliente" required class="p-2 bg-white border border-slate-300 rounded">
+                            <option value="">Seleccionar Cliente...</option>
+                            ${this.data.clientes.map(c => `<option value="${c.cod_cliente}" ${this.getVal('ord_fabricaciones', 'cod_cliente') === c.cod_cliente ? 'selected' : ''}>${c.cod_cliente} - ${c.razon_social}</option>`).join('')}
+                        </select>
+                    </div>
                 `, filter(this.data.ofs, this.filters.ofs, ['of', 'descripcion_of']), (o) => `
-                    <td class="p-3 font-bold">${o.of}</td><td class="p-3">${o.descripcion_of}</td><td class="p-3 text-blue-600">${o.cod_cliente}</td>
+                    <td class="p-3 font-bold text-slate-700">${o.of}</td><td class="p-3">${o.descripcion_of}</td><td class="p-3 text-blue-600 font-medium">${o.cod_cliente}</td><td class="p-3 italic text-slate-400">-</td>
                 `)}
 
                 <!-- OT -->
                 ${this.renderSection('ord_trabajos', 'ORDENES DE TRABAJO (OT)', 'indigo', 'form-ot', `
-                    <input name="ot" value="${this.getVal('ord_trabajos', 'ot')}" placeholder="NÚMERO OT (Auto)" class="p-2 bg-white border rounded">
-                    <input name="descripcion_ot" required value="${this.getVal('ord_trabajos', 'descripcion_ot')}" placeholder="DETALLE" class="p-2 bg-white border rounded">
-                    <select name="ofabricaciones" required class="p-2 bg-white border rounded">
-                        <option value="">Vincular a OF...</option>
-                        ${this.data.ofs.map(f => `<option value="${f.of}" ${this.getVal('ord_trabajos', 'ofabricaciones') === f.of ? 'selected' : ''}>${f.of} - ${f.descripcion_of}</option>`).join('')}
-                    </select>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-slate-400">Nº OT</label>
+                        <input name="ot" value="${this.getVal('ord_trabajos', 'ot')}" placeholder="OT-..." class="p-2 bg-white border border-slate-300 rounded">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-bold text-slate-400">DETALLE DE TRABAJO</label>
+                        <input name="descripcion_ot" required value="${this.getVal('ord_trabajos', 'descripcion_ot')}" placeholder="Tarea específica" class="p-2 bg-white border border-slate-300 rounded">
+                    </div>
+                    <div class="flex flex-col gap-1 md:col-span-2">
+                        <label class="text-[10px] font-bold text-slate-400">OF VINCULADA</label>
+                        <select name="ofabricaciones" required class="p-2 bg-white border border-slate-300 rounded">
+                            <option value="">Seleccionar Orden de Fabricación...</option>
+                            ${this.data.ofs.map(f => `<option value="${f.of}" ${this.getVal('ord_trabajos', 'ofabricaciones') === f.of ? 'selected' : ''}>${f.of} - ${f.descripcion_of}</option>`).join('')}
+                        </select>
+                    </div>
                 `, filter(this.data.ots, this.filters.ots, ['ot', 'descripcion_ot']), (t) => `
-                    <td class="p-3 font-bold">${t.ot}</td><td class="p-3">${t.descripcion_ot}</td><td class="p-3 font-mono text-indigo-600">${t.ofabricaciones}</td>
+                    <td class="p-3 font-bold text-slate-700">${t.ot}</td><td class="p-3">${t.descripcion_ot}</td><td class="p-3 font-mono text-indigo-600 font-bold">${t.ofabricaciones}</td><td class="p-3 italic text-slate-400">-</td>
                 `)}
             </div>
         `;
@@ -143,34 +166,44 @@ class AppController {
     renderSection(key, title, color, formId, formFields, list, rowTemplate) {
         const isEditing = this.editing.table === key;
         return `
-            <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-fadeIn">
                 <div class="flex justify-between items-center mb-6 border-b pb-4">
                     <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <span class="w-2 h-6 bg-${color}-500 rounded"></span> ${title}
                     </h3>
-                    <input type="text" placeholder="Buscar..." oninput="app.setFilter('${key}', this.value)" value="${this.filters[key] || ''}" class="pl-4 pr-4 py-1.5 bg-slate-50 border rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="text" placeholder="Buscar..." oninput="app.setFilter('${key}', this.value)" value="${this.filters[key] || ''}" class="pl-4 pr-10 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-500 w-64">
+                        <span class="absolute right-3 top-2 text-slate-400">🔍</span>
+                    </div>
                 </div>
-                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-slate-50 p-4 rounded-xl">
+                <form id="${formId}" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-slate-50 p-6 rounded-xl border border-slate-100">
                     ${formFields}
-                    <div class="md:col-span-4 flex gap-2">
-                        <button type="submit" class="flex-1 bg-${isEditing ? 'amber' : 'blue'}-600 text-white p-2 rounded font-bold hover:opacity-90">
-                            ${isEditing ? 'GUARDAR CAMBIOS' : 'CREAR REGISTRO'}
+                    <div class="md:col-span-4 flex gap-3 mt-2">
+                        <button type="submit" class="flex-1 bg-${isEditing ? 'amber' : 'blue'}-600 text-white p-2.5 rounded-lg font-bold shadow-md hover:opacity-90 transition-all">
+                            ${isEditing ? '💾 ACTUALIZAR REGISTRO' : '➕ CREAR REGISTRO'}
                         </button>
-                        ${isEditing ? `<button type="button" onclick="app.cancelEdit()" class="px-6 bg-slate-200 rounded font-bold">CANCELAR</button>` : ''}
+                        ${isEditing ? `<button type="button" onclick="app.cancelEdit()" class="px-8 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold hover:bg-slate-100">CANCELAR</button>` : ''}
                     </div>
                 </form>
-                <div class="border rounded-xl overflow-hidden">
+                <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
-                            <tr><th class="p-3">Dato Principal</th><th class="p-3">Descripción</th><th class="p-3">Adicional 1</th><th class="p-3">Adicional 2</th><th class="p-3 text-right">Acciones</th></tr>
+                        <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b">
+                            <tr>
+                                <th class="p-4">Dato Principal</th>
+                                <th class="p-4">Descripción / Proyecto</th>
+                                <th class="p-4">Vinculación</th>
+                                <th class="p-4">Estado / Stock</th>
+                                <th class="p-4 text-right">Acciones</th>
+                            </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-slate-100">
+                            ${list.length === 0 ? `<tr><td colspan="5" class="p-10 text-center text-slate-400 italic">No hay registros que coincidan con la búsqueda.</td></tr>` : ''}
                             ${list.map(item => `
-                                <tr class="border-t hover:bg-slate-50">
+                                <tr class="hover:bg-slate-50 transition-colors">
                                     ${rowTemplate(item)}
-                                    <td class="p-3 text-right">
-                                        <button onclick='app.startEdit("${key}", ${JSON.stringify(item).replace(/'/g, "&apos;")})' class="p-1 hover:bg-blue-100 rounded">✏️</button>
-                                        <button onclick="app.deleteRecord('${key}', '${item.id}')" class="p-1 hover:bg-rose-100 rounded">🗑️</button>
+                                    <td class="p-4 text-right space-x-1">
+                                        <button onclick='app.startEdit("${key}", ${JSON.stringify(item).replace(/'/g, "&apos;")})' class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">✏️</button>
+                                        <button onclick="app.deleteRecord('${key}', '${item.id}')" class="p-2 text-rose-600 hover:bg-rose-50 rounded-lg" title="Eliminar">🗑️</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -181,9 +214,51 @@ class AppController {
         `;
     }
 
+    renderPurchasesView(materials) {
+        return `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fadeIn">
+                <div class="p-6 bg-slate-50 border-b flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800">Compras / Inventario</h3>
+                        <p class="text-xs text-slate-500">Actualización rápida de costos y niveles de stock.</p>
+                    </div>
+                    <button onclick="app.refreshData()" class="p-2 bg-white border rounded-lg text-xs font-bold hover:bg-slate-100 transition-all">🔄 Sincronizar Ahora</button>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest">
+                        <tr>
+                            <th class="p-4 border-b">CÓDIGO</th>
+                            <th class="p-4 border-b">DESCRIPCIÓN</th>
+                            <th class="p-4 border-b">PRECIO UN ($)</th>
+                            <th class="p-4 border-b">STOCK ACTUAL</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${materials.map(m => `
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-4 font-bold text-slate-800">${m.codigo}</td>
+                                <td class="p-4 text-slate-600 text-sm">${m.descripcion}</td>
+                                <td class="p-4">
+                                    <input type="number" min="0" step="0.01" value="${m.precio_un}" 
+                                        onchange="app.updateMaterialField('${m.id}', 'precio_un', this.value, '${m.codigo}')"
+                                        class="w-28 p-1.5 bg-white border border-slate-200 rounded-md text-right font-mono focus:ring-2 focus:ring-blue-400 outline-none">
+                                </td>
+                                <td class="p-4">
+                                    <input type="number" min="0" value="${m.en_stock}" 
+                                        onchange="app.updateMaterialField('${m.id}', 'en_stock', this.value, '${m.codigo}')"
+                                        class="w-24 p-1.5 bg-white border border-slate-200 rounded-md text-right focus:ring-2 focus:ring-blue-400 outline-none">
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
     startEdit(table, item) {
         this.editing = { table, id: item.id, item };
-        this.render();
+        this.render(); // Redibujado instantáneo
     }
 
     cancelEdit() {
@@ -193,14 +268,18 @@ class AppController {
 
     setFilter(key, val) {
         this.filters[key] = val;
-        this.render();
+        this.render(); // Redibujado instantáneo sin peticiones de red
     }
 
     async deleteRecord(table, id) {
-        if (!confirm("¿Eliminar registro?")) return;
-        await this.supabase.from(table).delete().eq('id', id);
-        this.showToast("Eliminado");
-        this.render();
+        if (!confirm("¿Confirmar eliminación permanente del registro?")) return;
+        const { error } = await this.supabase.from(table).delete().eq('id', id);
+        if (!error) {
+            this.showToast("Registro eliminado");
+            await this.refreshData();
+        } else {
+            alert("No se puede eliminar: El registro está vinculado a otras tablas.");
+        }
     }
 
     attachMasterListeners() {
@@ -217,37 +296,65 @@ class AppController {
             form.onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = Object.fromEntries(new FormData(form).entries());
-                // Si el código está vacío y no estamos editando, eliminamos la key para que SQL use el DEFAULT (Sequence)
-                if (!formData.codigo && !this.editing.id) delete formData.codigo;
-                if (!formData.cod_cliente && !this.editing.id) delete formData.cod_cliente;
-                if (!formData.of && !this.editing.id) delete formData.of;
-                if (!formData.ot && !this.editing.id) delete formData.ot;
+                
+                // Limpieza de campos auto-incrementales si están vacíos
+                ['codigo', 'cod_cliente', 'of', 'ot'].forEach(key => {
+                    if (!formData[key] && !this.editing.id) delete formData[key];
+                });
 
                 const data = f.transform ? f.transform(formData) : formData;
 
                 let res;
-                if (this.editing.table === f.table) {
+                if (this.editing.table === f.table && this.editing.id) {
                     res = await this.supabase.from(f.table).update(data).eq('id', this.editing.id);
                 } else {
                     res = await this.supabase.from(f.table).insert([data]);
                 }
 
                 if (!res.error) {
-                    this.showToast("Éxito");
-                    this.cancelEdit();
+                    this.showToast("Datos sincronizados");
+                    this.editing = { table: null, id: null, item: null };
+                    await this.refreshData();
                 } else {
-                    alert("Error: " + res.error.message);
+                    alert("Error Supabase: " + res.error.message);
                 }
             };
         });
     }
 
+    async updateMaterialField(id, field, value, codigo) {
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || numValue < 0) {
+            this.showToast("Valor inválido");
+            await this.refreshData();
+            return;
+        }
+        if (!confirm(`¿Actualizar ${field === 'precio_un' ? 'precio' : 'stock'} de ${codigo}?`)) {
+            this.render();
+            return;
+        }
+        const obj = {}; obj[field] = numValue;
+        const { error } = await this.supabase.from('materiales').update(obj).eq('id', id);
+        if (!error) {
+            this.showToast("Stock actualizado");
+            await this.refreshData();
+        } else {
+            this.showToast("Error de conexión");
+            this.render();
+        }
+    }
+
     showToast(msg) {
         const t = document.getElementById('toast');
-        document.getElementById('toast-msg').innerText = msg;
+        const m = document.getElementById('toast-msg');
+        if (!t || !m) return;
+        m.innerText = msg;
         t.style.opacity = '1';
         t.style.transform = 'translateY(0)';
-        setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(24px)'; }, 2000);
+        setTimeout(() => { 
+            t.style.opacity = '0'; 
+            t.style.transform = 'translateY(24px)'; 
+        }, 2500);
     }
 }
 
