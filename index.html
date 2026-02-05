@@ -13,15 +13,6 @@
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-100 text-slate-900 overflow-hidden h-screen flex">
     <!-- Sidebar -->
@@ -33,21 +24,19 @@
             </h1>
         </div>
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Maestros</div>
             <button onclick="app.setView('BASE_DE_DATOS')" id="btn-BASE_DE_DATOS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Base de Datos</span>
-            </button>
-            <button onclick="app.setView('AUTOMATIZACION')" id="btn-AUTOMATIZACION" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Automatización (Materiales)</span>
-            </button>
-            <button onclick="app.setView('COMPRAS')" id="btn-COMPRAS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Compras (Stock/Precios)</span>
+                <span>Gestión de Registros</span>
             </button>
             <div class="h-px bg-slate-800 my-4"></div>
-            <button onclick="app.setView('PLANEAMIENTO')" id="btn-PLANEAMIENTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Planeamiento (OF)</span>
+            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Operaciones</div>
+            <button onclick="app.setView('COMPRAS')" id="btn-COMPRAS" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Compras / Inventario</span>
             </button>
-            <button onclick="app.setView('PROYECTO')" id="btn-PROYECTO" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
-                <span>Proyecto (OT)</span>
+            <div class="h-px bg-slate-800 my-4"></div>
+            <div class="text-[10px] text-slate-500 uppercase font-bold px-3 mb-2">Módulos</div>
+            <button onclick="app.setView('AUTOMATIZACION')" id="btn-AUTOMATIZACION" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
+                <span>Automatizacion</span>
             </button>
             <div class="h-px bg-slate-800 my-4"></div>
             <button onclick="app.setView('TECNICA')" id="btn-TECNICA" class="sidebar-item w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-all text-sm">
@@ -65,7 +54,7 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden">
         <header class="h-16 bg-white border-b px-8 flex items-center justify-between">
-            <h2 id="view-title" class="text-xl font-bold text-slate-800 uppercase tracking-tight">Dashboard</h2>
+            <h2 id="view-title" class="text-xl font-bold text-slate-800 uppercase tracking-tight">Cargando...</h2>
             <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-[10px] font-bold">
                 <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
                 <span id="status-text" class="uppercase">Verificando...</span>
@@ -76,14 +65,13 @@
             <!-- Contenido dinámico aquí -->
         </div>
 
-        <div id="toast" class="fixed bottom-8 right-8 opacity-0 transition-all duration-300 pointer-events-none">
-            <div class="bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl text-sm font-bold border-l-4 border-blue-500">
+        <div id="toast" class="fixed bottom-8 right-8 opacity-0 transition-all duration-300 pointer-events-none z-50">
+            <div class="bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl text-sm font-bold border-l-4 border-blue-500 flex items-center gap-3">
                 <span id="toast-msg"></span>
             </div>
         </div>
     </main>
 
     <script type="module" src="index.js"></script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
